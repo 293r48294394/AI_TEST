@@ -210,10 +210,10 @@
               <el-tab-pane label="① 测试地图" name="map">
                 <div class="hint mt8">Skill 1 产出。每行是一个功能模块；右侧「证据」是它引用的检索块编号。</div>
                 <el-table :data="mapRows" size="small" class="mt8" border>
-                  <el-table-column prop="id" label="ID" width="70" />
+                  <el-table-column prop="id" label="ID" width="70"></el-table-column>
                   <el-table-column label="功能名" width="160">
                     <template #default="{ row }">
-                      <el-input v-if="editableMap" v-model="row.name" size="small" />
+                      <el-input v-if="editableMap" v-model="row.name" size="small"></el-input>
                       <span v-else>{{ row.name }}</span>
                     </template>
                   </el-table-column>
@@ -222,7 +222,7 @@
                       <el-tag v-for="(r, i) in row.rules" :key="i" class="rule-tag" type="info"
                               :closable="editableMap" @close="row.rules.splice(i, 1)">{{ r }}</el-tag>
                       <el-input v-if="editableMap" v-model="row._newRule" size="small" placeholder="补充一条规则后回车"
-                                class="mt8" @keyup.enter="addRule(row)" />
+                                class="mt8" @keyup.enter="addRule(row)"></el-input>
                     </template>
                   </el-table-column>
                   <el-table-column label="证据" width="150">
@@ -237,17 +237,17 @@
               <!-- 测试点 -->
               <el-tab-pane :label="`② 测试点 ${run.testpoints ? run.testpoints.test_points.length : ''}`" name="points">
                 <el-table :data="pointRows" size="small" class="mt8" border max-height="520">
-                  <el-table-column prop="id" label="ID" width="80" />
+                  <el-table-column prop="id" label="ID" width="80"></el-table-column>
                   <el-table-column label="类别" width="90">
                     <template #default="{ row }">
                       <el-tag size="small" :type="catType(row.category)">{{ catText(row.category) }}</el-tag>
                     </template>
                   </el-table-column>
-                  <el-table-column prop="title" label="测试点" min-width="360" />
+                  <el-table-column prop="title" label="测试点" min-width="360"></el-table-column>
                   <el-table-column label="优先级" width="80">
                     <template #default="{ row }"><el-tag size="small" :type="row.priority === 'P0' ? 'danger' : row.priority === 'P1' ? 'warning' : 'info'">{{ row.priority }}</el-tag></template>
                   </el-table-column>
-                  <el-table-column prop="rationale" label="依据" min-width="200" />
+                  <el-table-column prop="rationale" label="依据" min-width="200"></el-table-column>
                   <el-table-column label="证据" width="110">
                     <template #default="{ row }">
                       <span class="mono">{{ (row.sources || []).map(s => s.chunk_id).join(',') || '—' }}</span>
@@ -277,9 +277,9 @@
                       </div>
                     </template>
                   </el-table-column>
-                  <el-table-column prop="id" label="ID" width="80" />
-                  <el-table-column prop="test_point_id" label="测试点" width="90" />
-                  <el-table-column prop="title" label="用例标题" min-width="320" />
+                  <el-table-column prop="id" label="ID" width="80"></el-table-column>
+                  <el-table-column prop="test_point_id" label="测试点" width="90"></el-table-column>
+                  <el-table-column prop="title" label="用例标题" min-width="320"></el-table-column>
                   <el-table-column label="类别" width="90">
                     <template #default="{ row }"><el-tag size="small" :type="catType(row.category)">{{ catText(row.category) }}</el-tag></template>
                   </el-table-column>
@@ -331,9 +331,9 @@
                         </el-tag>
                       </template>
                     </el-table-column>
-                    <el-table-column prop="type" label="类型" width="110" />
-                    <el-table-column prop="message" label="问题" min-width="420" />
-                    <el-table-column prop="ref" label="关联" width="90" />
+                    <el-table-column prop="type" label="类型" width="110"></el-table-column>
+                    <el-table-column prop="message" label="问题" min-width="420"></el-table-column>
+                    <el-table-column prop="ref" label="关联" width="90"></el-table-column>
                   </el-table>
                 </div>
                 <div v-else class="empty">尚未评审</div>
@@ -345,8 +345,8 @@
                   <div class="card card-bd" style="flex:1; min-width:420px">
                     <div class="hint">阶段耗时与质量信号</div>
                     <el-table :data="run.stages" size="small" class="mt8">
-                      <el-table-column prop="stage" label="阶段" width="130" />
-                      <el-table-column prop="duration_ms" label="耗时(ms)" width="100" />
+                      <el-table-column prop="stage" label="阶段" width="130"></el-table-column>
+                      <el-table-column prop="duration_ms" label="耗时(ms)" width="100"></el-table-column>
                       <el-table-column label="指标">
                         <template #default="{ row }">
                           <span class="mono">{{ Object.entries(row.metrics || {}).map(([k,v]) => k + '=' + v).join('  ') }}</span>
@@ -357,16 +357,16 @@
                   <div class="card card-bd" style="flex:1; min-width:420px">
                     <div class="hint">LLM 调用审计（来自 llm_calls.jsonl）</div>
                     <el-table :data="llmCalls" size="small" class="mt8" max-height="360">
-                      <el-table-column prop="task" label="任务" width="130" />
+                      <el-table-column prop="task" label="任务" width="130"></el-table-column>
                       <el-table-column label="结果" width="70">
                         <template #default="{ row }">
                           <el-tag size="small" :type="row.ok ? 'success' : 'danger'">{{ row.ok ? 'ok' : 'fail' }}</el-tag>
                         </template>
                       </el-table-column>
-                      <el-table-column prop="attempt" label="尝试" width="70" />
-                      <el-table-column prop="latency_ms" label="延迟(ms)" width="90" />
-                      <el-table-column prop="prompt_chars" label="输入字符" width="100" />
-                      <el-table-column prop="response_chars" label="输出字符" width="100" />
+                      <el-table-column prop="attempt" label="尝试" width="70"></el-table-column>
+                      <el-table-column prop="latency_ms" label="延迟(ms)" width="90"></el-table-column>
+                      <el-table-column prop="prompt_chars" label="输入字符" width="100"></el-table-column>
+                      <el-table-column prop="response_chars" label="输出字符" width="100"></el-table-column>
                     </el-table>
                   </div>
                 </div>
@@ -388,8 +388,8 @@
   </div>
 
   <el-dialog v-model="pasteVisible" title="粘贴 PRD 文本" width="720px">
-    <el-input v-model="pasteId" placeholder="prd_id，例如 coupon-center-v1.4" class="mt8" />
-    <el-input v-model="pasteText" type="textarea" :rows="16" class="mt8" placeholder="粘贴 Markdown 需求文档…" />
+    <el-input v-model="pasteId" placeholder="prd_id，例如 coupon-center-v1.4" class="mt8"></el-input>
+    <el-input v-model="pasteText" type="textarea" :rows="16" class="mt8" placeholder="粘贴 Markdown 需求文档…"></el-input>
     <template #footer>
       <el-button @click="pasteVisible = false">取消</el-button>
       <el-button type="primary" :loading="busy" @click="submitPaste">保存并解析</el-button>
