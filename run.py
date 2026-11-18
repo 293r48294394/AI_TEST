@@ -167,6 +167,71 @@ def cmd_doctor(args) -> int:
     return 0
 
 
+def cmd_cost(args) -> int:
+    from atp.eval.cost import render_markdown, summarize
+
+    settings = _settings()
+    store = RunStore(settings)
+    if not store.exists(args.run):
+        print(f"[error] 运行不存在：{args.run}", file=sys.stderr)
+        return 2
+    state = store.load(args.run)
+    calls = store.llm_calls(args.run)
+    if not calls:
+        print(f"[warn] {args.run} 没有任何 LLM 调用记录（mock 模式也会记录）", file=sys.stderr)
+    price_in = args.price_in if args.price_in is not None else _env_float("ATP_PRICE_IN")
+    price_out = args.price_out if args.price_out is not None else _env_float("ATP_PRICE_OUT")
+    summary = summarize(calls, price_in=price_in, price_out=price_out)
+    cases = len(state.cases.cases) if state.cases else 0
+    print(render_markdown([(state.run_id, summary, cases)]))
+    if summary.by_task:
+        print("\n## 按阶段拆分\n")
+        print("| 阶段 | 调用 | 估算输入 token | 估算输出 token |")
+        print("|---|---|---|---|")
+        for task, row in sorted(summary.by_task.items()):
+            print(f"| {task} | {row['calls']} | {row['in_tokens']} | {row['out_tokens']} |")
+    if summary.est_cost is None:
+        print("\n> 未配置单价：用 --price-in/--price-out（元/百万 token）或环境变量 ATP_PRICE_IN/ATP_PRICE_OUT 传入。")
+    return 0
+
+
+def _env_float(name: str) -> float | None:
+    import os
+
+    raw = os.environ.get(name)
+    try:
+        return float(raw) if raw else None
+    except ValueError:
+        return None
+
+
+def cmd_batch(args) -> int:
+    from atp.pipeline.batch import run_batch
+
+    settings = _settings()
+    ids = [p.strip() for p in args.prds.split(",") if p.strip()]
+    if not ids:
+        print("[error] --prds 为空", file=sys.stderr)
+        return 2
+    print(f"[batch] {len(ids)} 份 PRD，并发 {args.workers}，模式 {args.mode}")
+    result = run_batch(settings, ids, mode=args.mode, workers=args.workers, auto_confirm=True)
+
+    width = max(len(i.prd_id) for i in result.items)
+    print(f"\n{'文档'.ljust(width)}  状态      测试点  用例  评分  闸门    耗时")
+    for item in result.items:
+        print(
+            f"{item.prd_id.ljust(width)}  {item.status:<9} {item.points:>5}  {item.cases:>4}  "
+            f"{item.score if item.score is not None else '-':>4}  {item.gate or '-':<6} {item.duration_ms:>5}ms"
+            + (f"  ! {item.error}" if item.error else "")
+        )
+    s = result.summary()
+    print(
+        f"\n[summary] 成功 {s['success']}/{s['documents']}，失败率 {s['failure_rate']:.1%}，"
+        f"总耗时 {s['wall_ms'] / 1000:.1f}s，平均 {s['avg_ms']:.0f}ms/份，吞吐 {s['throughput_per_sec']:.2f} 份/秒"
+    )
+    return 0 if result.failed == 0 else 1
+
+
 def cmd_list(args) -> int:
     settings = _settings()
     orc = Orchestrator(settings, RunStore(settings))
@@ -234,6 +299,18 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("doctor", help="环境自检")
     p.set_defaults(func=cmd_doctor)
+
+    p = sub.add_parser("cost", help="单次运行的 token/成本估算")
+    p.add_argument("--run", required=True)
+    p.add_argument("--price-in", type=float, default=None, help="输入单价（元/百万 token）")
+    p.add_argument("--price-out", type=float, default=None, help="输出单价（元/百万 token）")
+    p.set_defaults(func=cmd_cost)
+
+    p = sub.add_parser("batch", help="多份 PRD 并发批跑")
+    p.add_argument("--prds", required=True, help="逗号分隔的 prd_id")
+    p.add_argument("--mode", default="rag", choices=["bare", "rag", "rag_hitl"])
+    p.add_argument("--workers", type=int, default=3)
+    p.set_defaults(func=cmd_batch)
 
     p = sub.add_parser("export", help="导出 Excel")
     p.add_argument("--run", required=True)

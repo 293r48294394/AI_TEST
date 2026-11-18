@@ -59,7 +59,7 @@ cp .env.example .env                   # 填入 LLM_API_KEY
 python run.py eval --prd coupon-center-prd --golden data/golden/coupon-golden.json --sweep --judge llm
 
 # 3. 测试与前端校验
-python -m pytest                       # 74 passed
+python -m pytest                       # 81 passed
 node scripts/check_web.js              # 模板编译校验（防白屏）
 python scripts/verify.py               # 一键验证：测试 + 前端 + 基准集 + 端到端 + 评测（约 9 秒）
 
@@ -111,6 +111,29 @@ CI 走同一套命令（`.github/workflows/ci.yml`）：pytest → 前端编译 
    并加了 `test_prompts_are_domain_neutral` 防止以后再写回去。
 
 > 没有这个第二份文档，上面两个问题都不会暴露。这也是"拿一份文档调通就宣称通用"不可信的原因。
+
+### 批量与成本（`batch` / `cost`）
+
+单份跑通不等于能上量。`python run.py batch --prds a,b --mode rag --workers 2`：
+
+| 项 | 实测（mock，2 份文档） |
+|---|---|
+| 成功 / 失败 | 2 / 0 |
+| 总耗时 | 0.1s |
+| 平均 | 32ms/份 |
+| 吞吐 | 31.25 份/秒 |
+
+> 这组数字只反映**管道开销**（mock 不调模型），不能当性能结论。
+> 它证明的是：并发跑多份不会互相覆盖产物（run_id 唯一）、单份失败不拖垮整批。
+
+`python run.py cost --run <id>` 把 `llm_calls.jsonl` 折算成 token：
+
+| 运行 | LLM 调用 | 输入字符 | 输出字符 | 估算输入 token | 估算输出 token |
+|---|---|---|---|---|---|
+| 20261118-158bd0 | 6 | 32690 | 15749 | 25681 | 12372 |
+
+**刻意不内置单价**——价目会变，写死一个数字就是造数据。传入 `--price-in/--price-out`
+（元/百万 token）才会算金额，并同时给出"单条用例成本"，面试问"贵不贵"时能直接答。
 
 ### 基准集质检（`python run.py lint-golden`）
 
@@ -204,7 +227,7 @@ data/prd/              coupon-center-prd.md（营销，2478 字，10 处隐性�
                        account-login-prd.md（账号安全，用于跨文档泛化验证）
 data/golden/           coupon-golden.json（42 条主基准，20 条隐性）
                        account-login-golden.json（20 条泛化探针，不当模型能力用）
-tests/                 74 个测试
+tests/                 81 个测试
 reports/               评测报告 + 基准集复核表单
 docs/                  架构 / 实验计划 / 面试问答 / 简历叙事
 ```
@@ -223,7 +246,8 @@ docs/                  架构 / 实验计划 / 面试问答 / 简历叙事
    说明基线匹配本来就脆，真实模型下的曲线才有解释价值。
 5. **人工确认在评测里是"录制回放"**：`rag_hitl` 模式用的是落盘的人工修改版测试地图，
    保证可复现，但不是本次实时人审——报告里必须写明。
-6. **无并发/性能验证**：流水线是同步的，100 个 PRD 批量跑会慢。
+6. **并发只测了管道开销**：mock 下 2 份并发 0.1s，但真实模型的延迟/限流/重试未测，
+   批量跑 100 份的稳定性未知；同步阻塞的客户端在真实 API 下可能不是这个数量级。
 
 ---
 
