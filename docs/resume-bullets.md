@@ -23,7 +23,7 @@
 
 1. 将 PRD→测试用例拆解为需求拆解、测试点生成、用例生成、质量评审四个可独立验证的 Skill，
    以显式状态机串联并在需求拆解后插入人工确认闸门，阻断未经复核的中间产物流入下游；
-   人工改动以 `+{{n}}/-{{n}}/~{{n}}` 量化记录。
+   人工改动以 `+0/-0/~1` 量化记录。
 
 2. 构建 **42 条基准集**（其中 20 条来自 PRD 表格脚注/修订记录等隐性规则），由测试工程师逐条复核
    （39 条通过、3 条修正，修的是 AI 编造的 PRD 未定义 UI 断言与 1 处分类错误），
@@ -37,8 +37,10 @@
    并解决真实模型输出被 max_tokens 截断导致整条流水线失败的问题（截断检测 + 压缩重试）；
    评审闸门为 `revise` 时导出接口直接拒绝，避免低质量用例进入用例库。
 
-4. 为平台自身编写 **102 个 pytest**（解析/检索/契约修复/覆盖规则/闸门/导出/指标，全离线可跑），
-   并将 AI 质量指标纳入评测报告（Match Rate / Fidelity / 格式合规率 / 采纳率 `{{q}}%`）。
+4. 为平台自身编写 **106 个 pytest**（解析/检索/契约修复/覆盖规则/闸门/导出/指标，全离线可跑），
+   并将 AI 质量指标纳入评测报告：场景召回 35.7%、隐性规则召回 35%、Fidelity 13–29%；
+   人工裁决 30 条采纳率 100%，抽查 10 条**断言充分率 60%**——缺口集中在
+   "不返还 / 不重新发券 / 不回滚"这类**负向约束**。
 
 **关键词行**：FastAPI、pydantic、BM25 检索、human-in-the-loop、JSON Schema 约束生成、
 pytest、评测基准集设计
@@ -50,7 +52,7 @@ pytest、评测基准集设计
 1. Decomposed PRD-to-test-case generation into four independently verifiable skills
    (requirement mapping, test-point design, case generation, quality review), orchestrated by an
    explicit state machine with a human-in-the-loop gate before case generation; human edits are
-   quantified as `+{{n}}/-{{n}}/~{{n}}`.
+   quantified as `+0/-0/~1`.
 
 2. Built a 42-item golden set (20 items derived from buried rules in tables, footnotes and revision
    logs), human-reviewed (39 accepted / 3 corrected) and validated by deterministic checks for source
@@ -65,8 +67,10 @@ pytest、评测基准集设计
    diagnosed and fixed real-model JSON truncation (finish_reason=length) with compress-and-retry;
    export is blocked when the review gate returns `revise`.
 
-4. Wrote 102 offline pytest cases covering parsing, retrieval, contract repair, coverage rules,
-   gating and metrics; tracked Match Rate / Fidelity / format compliance / adoption (`{{q}}%`).
+4. Wrote 106 offline pytest cases covering parsing, retrieval, contract repair, coverage rules,
+   gating and metrics; tracked Match Rate 35.7% / implicit-rule recall 35% / Fidelity 13–29%,
+   human adoption 100% (30/30), and assertion sufficiency 60% (6/10 spot check) with gaps
+   concentrated in negative constraints (no-return / no-reissue / no-rollback).
 
 ---
 
@@ -75,8 +79,8 @@ pytest、评测基准集设计
 | ❌ 不推荐 | ✅ 推荐 | 为什么 |
 |---|---|---|
 | 基于 LangChain 和 DeepSeek 实现了 PRD 到测试用例的自动生成 | 把生成拆成四个可独立验证的阶段，并量化每阶段的失败模式 | 前者谁都能写，后者证明你会验证 |
-| 使用 AI 提升测试效率 70% | 采纳率 {{q}}%（{{u}}/{{n}} 条可用），其余需人工改写 | 前者无出处，后者有分母 |
-| 熟悉 Prompt Engineering | 用 JSON Schema 约束输出并设计 2 轮错误回喂，一次通过率 {{p}}% | 前者是形容词，后者是事实 |
+| 使用 AI 提升测试效率 70% | 人工裁决 30 条采纳率 100%，抽查 10 条断言充分率 60% | 前者无出处，后者有分母 |
+| 熟悉 Prompt Engineering | 用 JSON Schema 约束输出并设计 2 轮错误回喂，一次通过率 75%–87.5% | 前者是形容词，后者是事实 |
 | 完成了一个测试平台 | 102 个测试覆盖四阶段与闸门，导出在评审不通过时拒绝 | 可验证的工程量 |
 
 ---

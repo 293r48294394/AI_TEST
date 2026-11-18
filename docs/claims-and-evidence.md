@@ -40,7 +40,8 @@
 | 隐性规则召回 20% → 25% → 35%（4→5→7 / 20） | 同上 | 同上 | 强（同上，样本仅 20 条隐性规则） |
 | 阈值敏感性分析 | `sweep_threshold`、`tests/test_eval_judge.py` | `eval --sweep` | 中（曲线有了，解读待真实模型） |
 | Fidelity 13–29%（三模式，LLM judge） | `atp/eval/judge.py`、报告 `fidelity_*` 字段 | `eval --judge llm` | 中（judge 未与人工评分做致率抽检，只能当"参考方向"） |
-| 采纳率 | `POST /adoption` + `adoption_stats` | 界面逐条裁决 | **弱**（无分母，未实测） |
+| 采纳率 100%（30/30） | 运行 `20261118-7c55a2` 的 `adoption` 记录、`reports/adoption-spotcheck.md` | 控制台逐条裁决 | 强（本人在界面逐条裁决，记录在 state.json） |
+| 断言充分率 60%（6/10） | `reports/adoption-spotcheck.md`（约束清单 + 逐条结论） | 对着 PRD 复走 10 条用例 | 中（AI 按 PRD 拆约束并初判、作者确认；未逐条人工复核） |
 
 ## 三、成本与性能
 

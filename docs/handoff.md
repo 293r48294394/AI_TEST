@@ -20,12 +20,12 @@
 | 测试 | `python -m pytest` 全绿（当前 105 个） | `python -m pytest` |
 | 一键验证 | 6 步全绿 | `python scripts/verify.py` |
 
-**未完成的只剩一件**：采纳率（需要你在控制台逐条裁决 ≥30 条用例）。
+**代码与数据侧全部完成**，剩下的只有发布动作（推进 GitHub / 录视频 / 改简历），见 `下一步.md`。
 
-基准集已于 2026-11-18 人工复核完成（屈永康：39 通过 / 3 修正，机器质检 0 error），
-证据在 `docs/examples/golden-review-applied.diff`。
-真实模型评测也已跑完（deepseek-chat，2026-11-18）：三模式召回 30.9%/33.3%/35.7%，
-隐性规则 20%/25%/35%，Fidelity 15.4%/28.6%/13.3%，数字已写入 README。
+已完成的关键结果：
+- 基准集人工复核：39 通过 / 3 修正，质检 0 error（`docs/examples/golden-review-applied.diff`）
+- 真实模型评测：三模式召回 30.9% / 33.3% / 35.7%，隐性规则 20% / 25% / 35%，Fidelity 15.4% / 28.6% / 13.3%
+- 人工裁决：30/30 可用（采纳率 100%）；抽查 10 条断言充分率 60%（`reports/adoption-spotcheck.md`）
 
 ## 二、你回来后的四条命令
 
