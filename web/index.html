@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI 测试用例生成平台 · 控制台</title>
+<link rel="stylesheet" href="/vendor/element-plus.css" />
+<style>
+  :root {
+    --ink: #0f172a; --muted: #64748b; --line: #e2e8f0; --bg: #f6f8fb;
+    --brand: #2563eb; --ok: #16a34a; --warn: #d97706; --bad: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font-family: "Segoe UI", "Microsoft YaHei", system-ui, -apple-system, sans-serif; }
+  #app { min-height: 100vh; }
+  .topbar { background: linear-gradient(120deg, #0f172a 0%, #1e3a8a 55%, #2563eb 100%);
+            color: #fff; padding: 18px 28px; display: flex; align-items: center; gap: 16px; }
+  .topbar h1 { font-size: 18px; margin: 0; font-weight: 650; letter-spacing: .3px; }
+  .topbar .sub { font-size: 12px; opacity: .72; margin-left: 2px; }
+  .topbar .spacer { flex: 1; }
+  .badge { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.14);
+           border: 1px solid rgba(255,255,255,.22); }
+  .badge.live { background: rgba(22,163,74,.28); border-color: rgba(134,239,172,.5); }
+  .badge.mock { background: rgba(217,119,6,.28); border-color: rgba(253,230,138,.5); }
+  .wrap { padding: 18px 22px 40px; max-width: 1600px; margin: 0 auto; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px;
+          box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+  .card-hd { padding: 14px 16px 10px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
+  .card-hd h3 { margin: 0; font-size: 14px; font-weight: 650; }
+  .card-bd { padding: 14px 16px; }
+  .prd-item { padding: 9px 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; margin-bottom: 6px; }
+  .prd-item:hover { background: #f1f5f9; }
+  .prd-item.active { background: #eff6ff; border-color: #bfdbfe; }
+  .prd-item .name { font-size: 13px; font-weight: 600; }
+  .prd-item .meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .status-strip { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; padding: 12px 16px;
+                  background: #f8fafc; border-bottom: 1px solid var(--line); border-radius: 12px 12px 0 0; }
+  .kv { font-size: 12px; color: var(--muted); }
+  .kv b { display: block; font-size: 15px; color: var(--ink); font-weight: 650; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .hint { color: var(--muted); font-size: 13px; line-height: 1.7; }
+  .mono { font-family: "Cascadia Mono", Consolas, monospace; font-size: 12px; }
+  .empty { padding: 60px 20px; text-align: center; color: var(--muted); }
+  .rule-tag { margin: 0 6px 6px 0; max-width: 100%; white-space: normal; height: auto; line-height: 1.5; padding: 4px 8px; }
+  .step { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
+  .step:last-child { border-bottom: 0; }
+  .step .no { color: var(--muted); width: 18px; flex: none; }
+  .step .exp { color: #166534; }
+  .grade { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .grade.pass { color: var(--ok); } .grade.revise { color: var(--bad); }
+  .foot { display: flex; gap: 18px; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--line);
+          font-size: 12px; color: var(--muted); background: #fbfcfe; border-radius: 0 0 12px 12px; }
+  .bar { display: flex; gap: 10px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .full { width: 100%; }
+  .mt8 { margin-top: 8px; } .mt12 { margin-top: 12px; }
+  .suggest { font-size: 13px; line-height: 1.8; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div>
+      <h1>PRD → 测试点 → 用例 · 可验证生成流水线</h1>
+      <div class="sub">四 Skill 顺序执行 · 人工确认闸门 · JSON 契约校验 · 全量调用审计</div>
+    </div>
+    <div class="spacer"></div>
+    <span class="badge" :class="health.live_llm ? 'live' : 'mock'">
+      {{ health.live_llm ? '真实模型' : '离线基线' }} · {{ health.model || '-' }}
+    </span>
+    <span class="badge">运行 {{ runs.length }}</span>
+    <el-button size="small" @click="refreshAll" :loading="busy">刷新</el-button>
+  </div>
+
+  <div class="wrap">
+    <el-row :gutter="16">
+      <!-- 左：PRD 与运行列表 -->
+      <el-col :span="6">
+        <div class="card">
+          <div class="card-hd">
+            <h3>需求文档</h3>
+            <div style="flex:1"></div>
+            <el-button size="small" type="primary" plain @click="pasteVisible = true">粘贴</el-button>
+            <el-upload :show-file-list="false" :http-request="doUpload" accept=".md,.txt,.docx">
+              <el-button size="small" plain>上传</el-button>
+            </el-upload>
+          </div>
+          <div class="card-bd" style="max-height: 320px; overflow: auto;">
+            <div v-if="!prds.length" class="hint">还没有需求文档。点「上传」选一份 PRD，或「粘贴」文本。</div>
+            <div v-for="p in prds" :key="p.prd_id" class="prd-item" :class="{active: currentPrd === p.prd_id}" @click="currentPrd = p.prd_id">
+              <div class="name">{{ p.prd_id }}</div>
+              <div class="meta">
+                {{ p.stats ? `${p.stats.chars} 字 · ${p.stats.chunks} 块` : '' }}
+                <span v-if="p.stats && p.stats.has_footnotes"> · 含脚注</span>
+                <span v-if="p.stats && p.stats.has_tables"> · 含表格</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt12">
+          <div class="card-hd"><h3>新建运行</h3></div>
+          <div class="card-bd">
+            <div class="hint">模式决定"有没有检索"和"有没有人工闸门"：</div>
+            <el-radio-group v-model="mode" class="mt8" style="display:flex; flex-direction:column; gap:8px;">
+              <el-radio value="bare">bare · 裸提示词（无检索）</el-radio>
+              <el-radio value="rag">rag · 检索增强</el-radio>
+              <el-radio value="rag_hitl">rag_hitl · 检索 + 人工确认</el-radio>
+            </el-radio-group>
+            <el-button type="primary" class="full mt12" :loading="busy" :disabled="!currentPrd" @click="startRun">
+              开始运行{{ currentPrd ? '：' + currentPrd : '' }}
+            </el-button>
+            <div class="hint mt8" v-if="mode === 'rag_hitl'">会在「测试地图」阶段暂停，等你修改后再继续。</div>
+          </div>
+        </div>
+
+        <div class="card mt12">
+          <div class="card-hd"><h3>历史运行</h3></div>
+          <div class="card-bd" style="max-height: 360px; overflow: auto;">
+            <div v-if="!runs.length" class="hint">暂无</div>
+            <div v-for="r in runs" :key="r.run_id" class="prd-item" @click="loadRun(r.run_id)">
+              <div class="name mono">{{ r.run_id }}</div>
+              <div class="meta">
+                {{ r.mode }} · {{ statusText(r.status) }} · 点 {{ r.n_testpoints }} / 例 {{ r.n_cases }}
+                <span v-if="r.review_score != null"> · 分 {{ r.review_score }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </el-col>
+
+      <!-- 右：运行详情 -->
+      <el-col :span="18">
+        <div class="card">
+          <div v-if="!run" class="empty">
+            <div style="font-size:15px; margin-bottom:8px;">选择一份 PRD，点「开始运行」</div>
+            <div class="hint">流水线：需求拆解 →（人工确认）→ 测试点 → 用例 → 评审 → 导出</div>
+          </div>
+          <template v-else>
+            <div class="status-strip">
+              <div class="kv">运行 ID<b class="mono" style="font-size:13px">{{ run.run_id }}</b></div>
+              <div class="kv">需求<b>{{ run.prd_id }}</b></div>
+              <div class="kv">模式<b>{{ run.mode }}</b></div>
+              <div class="kv">状态<b>{{ statusText(run.status) }}</b></div>
+              <div class="kv">阶段<b>{{ stageText(run.stage) }}</b></div>
+              <div class="kv">测试点<b>{{ run.testpoints ? run.testpoints.test_points.length : 0 }}</b></div>
+              <div class="kv">用例<b>{{ run.cases ? run.cases.cases.length : 0 }}</b></div>
+              <div class="kv">评审<b>{{ run.review ? run.review.score : '-' }}</b></div>
+              <div style="flex:1"></div>
+              <el-button size="small" @click="exportXlsx" :disabled="!run.cases">导出 Excel</el-button>
+            </div>
+
+            <el-alert v-if="run.status === 'awaiting_human'" type="warning" :closable="false" show-icon
+                      title="人工确认闸门：AI 草稿已生成，但未经确认不会流入下游"
+                      style="border-radius:0;">
+              <template #default>
+                <div class="hint" style="color:#92400e">
+                  请检查「测试地图」：AI 是否漏了功能？业务规则是否写错？带脚注的隐性规则有没有被抽出来？
+                  修改后点「提交确认并继续」。
+                </div>
+                <div class="mt8">
+                  <el-button size="small" type="primary" @click="submitTestmap" :loading="busy">提交确认并继续</el-button>
+                  <el-button size="small" @click="acceptDraft" :loading="busy">接受 AI 草稿直接继续</el-button>
+                </div>
+              </template>
+            </el-alert>
+
+            <el-alert v-if="run.status === 'failed'" type="error" :closable="false" show-icon
+                      :title="'运行失败：' + (run.errors[run.errors.length - 1] || '')" style="border-radius:0;"></el-alert>
+
+            <div class="bar" v-if="run.hitl && run.hitl.confirmed">
+              <el-tag type="success" effect="plain">人工确认已完成</el-tag>
+              <span class="hint">改动：{{ (run.hitl.diff && run.hitl.diff.summary) || '无' }}</span>
+            </div>
+
+            <el-tabs v-model="tab" style="padding: 0 16px 8px;">
+              <!-- 测试地图 -->
+              <el-tab-pane label="① 测试地图" name="map">
+                <div class="hint mt8">Skill 1 产出。每行是一个功能模块；右侧「证据」是它引用的检索块编号。</div>
+                <el-table :data="mapRows" size="small" class="mt8" border>
+                  <el-table-column prop="id" label="ID" width="70" />
+                  <el-table-column label="功能名" width="160">
+                    <template #default="{ row }">
+                      <el-input v-if="editableMap" v-model="row.name" size="small" />
+                      <span v-else>{{ row.name }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="业务规则" min-width="380">
+                    <template #default="{ row }">
+                      <el-tag v-for="(r, i) in row.rules" :key="i" class="rule-tag" type="info"
+                              :closable="editableMap" @close="row.rules.splice(i, 1)">{{ r }}</el-tag>
+                      <el-input v-if="editableMap" v-model="row._newRule" size="small" placeholder="补充一条规则后回车"
+                                class="mt8" @keyup.enter="addRule(row)" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="证据" width="150">
+                    <template #default="{ row }">
+                      <el-tag v-for="s in row.sources" :key="s.chunk_id" size="small" effect="plain">{{ s.chunk_id }}</el-tag>
+                    </template>
+                  </el-table-column>
+                </el-table>
+                <div class="hint mt8" v-if="editableMap">可直接编辑功能名、增删业务规则；提交后这份"人工版"会作为下游输入。</div>
+              </el-tab-pane>
+
+              <!-- 测试点 -->
+              <el-tab-pane :label="`② 测试点 ${run.testpoints ? run.testpoints.test_points.length : ''}`" name="points">
+                <el-table :data="pointRows" size="small" class="mt8" border max-height="520">
+                  <el-table-column prop="id" label="ID" width="80" />
+                  <el-table-column label="类别" width="90">
+                    <template #default="{ row }">
+                      <el-tag size="small" :type="catType(row.category)">{{ catText(row.category) }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="title" label="测试点" min-width="360" />
+                  <el-table-column label="优先级" width="80">
+                    <template #default="{ row }"><el-tag size="small" :type="row.priority === 'P0' ? 'danger' : row.priority === 'P1' ? 'warning' : 'info'">{{ row.priority }}</el-tag></template>
+                  </el-table-column>
+                  <el-table-column prop="rationale" label="依据" min-width="200" />
+                  <el-table-column label="证据" width="110">
+                    <template #default="{ row }">
+                      <span class="mono">{{ (row.sources || []).map(s => s.chunk_id).join(',') || '—' }}</span>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </el-tab-pane>
+
+              <!-- 用例 -->
+              <el-tab-pane :label="`③ 用例 ${run.cases ? run.cases.cases.length : ''}`" name="cases">
+                <div class="hint mt8">点行首箭头展开步骤与预期。右侧按钮记录你的逐条裁决 —— 采纳率指标的原始数据。</div>
+                <el-table :data="caseRows" size="small" class="mt8" border max-height="560">
+                  <el-table-column type="expand">
+                    <template #default="{ row }">
+                      <div style="padding: 8px 18px 14px;">
+                        <div v-if="row.preconditions && row.preconditions.length" class="hint">
+                          前置：{{ row.preconditions.join('；') }}
+                        </div>
+                        <div v-for="(s, i) in row.steps" :key="i" class="step">
+                          <span class="no">{{ i + 1 }}</span>
+                          <span style="flex:1">{{ s.action }}</span>
+                          <span class="exp">→ {{ s.expected }}</span>
+                        </div>
+                        <div class="hint mt8" v-if="row.test_data && Object.keys(row.test_data).length">
+                          测试数据：<span class="mono">{{ Object.entries(row.test_data).map(([k,v]) => k + '=' + v).join('  ') }}</span>
+                        </div>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="id" label="ID" width="80" />
+                  <el-table-column prop="test_point_id" label="测试点" width="90" />
+                  <el-table-column prop="title" label="用例标题" min-width="320" />
+                  <el-table-column label="类别" width="90">
+                    <template #default="{ row }"><el-tag size="small" :type="catType(row.category)">{{ catText(row.category) }}</el-tag></template>
+                  </el-table-column>
+                  <el-table-column label="裁决" width="230">
+                    <template #default="{ row }">
+                      <el-button-group>
+                        <el-button size="small" :type="verdictOf(row.id) === 'usable' ? 'success' : ''" @click="adopt(row.id, 'usable')">可用</el-button>
+                        <el-button size="small" :type="verdictOf(row.id) === 'needs_edit' ? 'warning' : ''" @click="adopt(row.id, 'needs_edit')">需改</el-button>
+                        <el-button size="small" :type="verdictOf(row.id) === 'unusable' ? 'danger' : ''" @click="adopt(row.id, 'unusable')">不可用</el-button>
+                      </el-button-group>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </el-tab-pane>
+
+              <!-- 评审 -->
+              <el-tab-pane :label="`④ 评审 ${run.review ? run.review.score : ''}`" name="review">
+                <div v-if="run.review" class="mt12">
+                  <el-row :gutter="16">
+                    <el-col :span="6">
+                      <div class="card card-bd" style="text-align:center">
+                        <div class="grade" :class="run.review.gate">{{ run.review.score }}</div>
+                        <el-tag :type="run.review.gate === 'pass' ? 'success' : 'danger'" effect="dark">
+                          {{ run.review.gate === 'pass' ? '通过' : '需修订' }}
+                        </el-tag>
+                        <div class="hint mt8">{{ run.review.gate === 'pass' ? '可导出正式用例' : '阻止导出正式文件' }}</div>
+                      </div>
+                    </el-col>
+                    <el-col :span="18">
+                      <div class="card card-bd">
+                        <div class="hint">六类覆盖（测试点维度）</div>
+                        <div class="mt8">
+                          <el-tag v-for="(v, k) in run.review.coverage" :key="k" style="margin:0 8px 8px 0"
+                                  :type="catType(k)">{{ catText(k) }} {{ v }}</el-tag>
+                        </div>
+                        <div class="hint mt8">改进建议</div>
+                        <div class="suggest" v-if="run.review.suggestions.length">
+                          <div v-for="(s, i) in run.review.suggestions" :key="i">· {{ s }}</div>
+                        </div>
+                        <div class="hint" v-else>无</div>
+                      </div>
+                    </el-col>
+                  </el-row>
+                  <el-table :data="run.review.issues" size="small" class="mt12" border max-height="420">
+                    <el-table-column label="级别" width="90">
+                      <template #default="{ row }">
+                        <el-tag size="small" :type="row.severity === 'blocker' ? 'danger' : row.severity === 'major' ? 'warning' : 'info'">
+                          {{ row.severity }}
+                        </el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="type" label="类型" width="110" />
+                    <el-table-column prop="message" label="问题" min-width="420" />
+                    <el-table-column prop="ref" label="关联" width="90" />
+                  </el-table>
+                </div>
+                <div v-else class="empty">尚未评审</div>
+              </el-tab-pane>
+
+              <!-- 日志 -->
+              <el-tab-pane label="⑤ 运行日志" name="logs">
+                <div class="mt12" style="display:flex; gap:16px; flex-wrap:wrap">
+                  <div class="card card-bd" style="flex:1; min-width:420px">
+                    <div class="hint">阶段耗时与质量信号</div>
+                    <el-table :data="run.stages" size="small" class="mt8">
+                      <el-table-column prop="stage" label="阶段" width="130" />
+                      <el-table-column prop="duration_ms" label="耗时(ms)" width="100" />
+                      <el-table-column label="指标">
+                        <template #default="{ row }">
+                          <span class="mono">{{ Object.entries(row.metrics || {}).map(([k,v]) => k + '=' + v).join('  ') }}</span>
+                        </template>
+                      </el-table-column>
+                    </el-table>
+                  </div>
+                  <div class="card card-bd" style="flex:1; min-width:420px">
+                    <div class="hint">LLM 调用审计（来自 llm_calls.jsonl）</div>
+                    <el-table :data="llmCalls" size="small" class="mt8" max-height="360">
+                      <el-table-column prop="task" label="任务" width="130" />
+                      <el-table-column label="结果" width="70">
+                        <template #default="{ row }">
+                          <el-tag size="small" :type="row.ok ? 'success' : 'danger'">{{ row.ok ? 'ok' : 'fail' }}</el-tag>
+                        </template>
+                      </el-table-column>
+                      <el-table-column prop="attempt" label="尝试" width="70" />
+                      <el-table-column prop="latency_ms" label="延迟(ms)" width="90" />
+                      <el-table-column prop="prompt_chars" label="输入字符" width="100" />
+                      <el-table-column prop="response_chars" label="输出字符" width="100" />
+                    </el-table>
+                  </div>
+                </div>
+              </el-tab-pane>
+            </el-tabs>
+
+            <div class="foot">
+              <span>LLM 模式：{{ run.llm_mode }}</span>
+              <span>创建：{{ run.created_at }}</span>
+              <span>更新：{{ run.updated_at }}</span>
+              <span v-if="run.adoption_rate && run.adoption_rate.total">
+                采纳率：{{ (run.adoption_rate.rate * 100).toFixed(1) }}%（{{ run.adoption_rate.usable }}/{{ run.adoption_rate.total }}）
+              </span>
+            </div>
+          </template>
+        </div>
+      </el-col>
+    </el-row>
+  </div>
+
+  <el-dialog v-model="pasteVisible" title="粘贴 PRD 文本" width="720px">
+    <el-input v-model="pasteId" placeholder="prd_id，例如 coupon-center-v1.4" class="mt8" />
+    <el-input v-model="pasteText" type="textarea" :rows="16" class="mt8" placeholder="粘贴 Markdown 需求文档…" />
+    <template #footer>
+      <el-button @click="pasteVisible = false">取消</el-button>
+      <el-button type="primary" :loading="busy" @click="submitPaste">保存并解析</el-button>
+    </template>
+  </el-dialog>
+</div>
+
+<script src="/vendor/vue.global.prod.js"></script>
+<script src="/vendor/element-plus.full.min.js"></script>
+<script>
+const { createApp, ref, computed, onMounted } = Vue;
+const { ElMessage, ElMessageBox } = ElementPlus;
+
+const CAT_TEXT = { normal: '正常', exception: '异常', boundary: '边界', security: '安全', compat: '兼容', performance: '性能' };
+const CAT_TYPE = { normal: 'primary', exception: 'danger', boundary: 'warning', security: 'info', compat: 'success', performance: 'info' };
+const STATUS_TEXT = { running: '运行中', awaiting_human: '待人工确认', failed: '失败', completed: '已完成', aborted: '中止' };
+const STAGE_TEXT = { s1_testmap: '① 需求拆解', gate1: '人工确认闸门', s2_testpoints: '② 测试点生成', s3_testcases: '③ 用例生成', s4_review: '④ 质量评审', done: '完成' };
+
+createApp({
+  setup() {
+    const health = ref({});
+    const prds = ref([]);
+    const runs = ref([]);
+    const run = ref(null);
+    const llmCalls = ref([]);
+    const currentPrd = ref('');
+    const mode = ref('rag_hitl');
+    const busy = ref(false);
+    const tab = ref('map');
+    const pasteVisible = ref(false);
+    const pasteId = ref('coupon-center-v1.4');
+    const pasteText = ref('');
+    const editableDraft = ref(null); // 本地编辑中的测试地图
+
+    async function api(path, opts = {}) {
+      const res = await fetch(path, opts);
+      if (!res.ok) {
+        let detail = res.statusText;
+        try { const body = await res.json(); detail = body.detail || JSON.stringify(body); } catch (e) {}
+        throw new Error(detail);
+      }
+      return res.status === 204 ? null : res.json();
+    }
+
+    const refreshAll = async () => {
+      busy.value = true;
+      try {
+        health.value = await api('/api/health');
+        prds.value = (await api('/api/prds')).items;
+        runs.value = (await api('/api/runs')).items;
+        if (!currentPrd.value && prds.value.length) currentPrd.value = prds.value[0].prd_id;
+      } catch (e) { ElMessage.error('刷新失败：' + e.message); }
+      finally { busy.value = false; }
+    };
+
+    const loadRun = async (id) => {
+      try {
+        run.value = await api('/api/runs/' + id);
+        // 处于闸门时，把 AI 草稿深拷贝进可编辑草稿，避免直接改动服务端状态
+        const src = run.value.testmap_ai || run.value.testmap_final;
+        editableDraft.value = run.value.status === 'awaiting_human' && src
+          ? src.features.map(f => ({ ...JSON.parse(JSON.stringify(f)), _newRule: '' }))
+          : null;
+        const ev = await api(`/api/runs/${id}/events`);
+        llmCalls.value = ev.llm_calls || [];
+        tab.value = run.value.status === 'awaiting_human' ? 'map' : (run.value.review ? 'review' : 'points');
+      } catch (e) { ElMessage.error('加载运行失败：' + e.message); }
+    };
+
+    const startRun = async () => {
+      busy.value = true;
+      try {
+        const st = await api('/api/runs', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prd_id: currentPrd.value, mode: mode.value }),
+        });
+        run.value = st;
+        await loadRun(st.run_id);
+        await refreshAll();
+        ElMessage.success(st.status === 'awaiting_human' ? '已生成 AI 草稿，等待你确认' : '运行完成');
+      } catch (e) { ElMessage.error('启动失败：' + e.message); }
+      finally { busy.value = false; }
+    };
+
+    const mapRows = computed(() => {
+      if (!run.value) return [];
+      if (editableDraft.value) return editableDraft.value;
+      const src = run.value.testmap_ai || run.value.testmap_final;
+      return src ? src.features : [];
+    });
+
+    const editableMap = computed(() => run.value && run.value.status === 'awaiting_human');
+
+    const pointRows = computed(() => (run.value && run.value.testpoints ? run.value.testpoints.test_points : []));
+    const caseRows = computed(() => (run.value && run.value.cases ? run.value.cases.cases : []));
+
+    const addRule = (row) => {
+      const v = (row._newRule || '').trim();
+      if (!v) return;
+      row.rules = row.rules || [];
+      row.rules.push(v);
+      row._newRule = '';
+    };
+
+    const submitTestmap = async () => {
+      busy.value = true;
+      try {
+        const features = mapRows.value.map(f => ({
+          id: f.id, name: f.name, summary: f.summary || '', rules: f.rules || [],
+          risks: f.risks || [], sources: f.sources || [],
+        }));
+        run.value = await api(`/api/runs/${run.value.run_id}/resume`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ features }),
+        });
+        editableDraft.value = null;
+        await loadRun(run.value.run_id);
+        await refreshAll();
+        ElMessage.success('已提交人工确认，下游已继续');
+      } catch (e) { ElMessage.error('提交失败：' + e.message); }
+      finally { busy.value = false; }
+    };
+
+    const acceptDraft = async () => {
+      try {
+        await ElMessageBox.confirm('确认接受 AI 草稿、不做任何修改？这会把"未经人审"的记录写进运行日志。', '确认', { type: 'warning' });
+      } catch (e) { return; }
+      busy.value = true;
+      try {
+        run.value = await api(`/api/runs/${run.value.run_id}/confirm`, { method: 'POST' });
+        editableDraft.value = null;
+        await loadRun(run.value.run_id);
+        await refreshAll();
+      } catch (e) { ElMessage.error('失败：' + e.message); }
+      finally { busy.value = false; }
+    };
+
+    const adopt = async (caseId, verdict) => {
+      try {
+        const res = await api(`/api/runs/${run.value.run_id}/adoption`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ case_id: caseId, verdict }),
+        });
+        run.value.adoption = res.adoption;
+        run.value.adoption_rate = res.rate;
+      } catch (e) { ElMessage.error('记录失败：' + e.message); }
+    };
+
+    const verdictOf = (caseId) => {
+      if (!run.value || !run.value.adoption) return '';
+      const hit = run.value.adoption.find(a => a.case_id === caseId);
+      return hit ? hit.verdict : '';
+    };
+
+    const exportXlsx = () => {
+      if (!run.value) return;
+      window.open(`/api/runs/${run.value.run_id}/export.xlsx`, '_blank');
+    };
+
+    const doUpload = async (opt) => {
+      busy.value = true;
+      try {
+        const res = await fetch('/api/prds/upload?filename=' + encodeURIComponent(opt.file.name), {
+          method: 'POST', body: opt.file,
+        });
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.detail || '上传失败');
+        ElMessage.success(`已解析 ${body.prd_id}：${body.stats.chars} 字 / ${body.stats.chunks} 块`);
+        await refreshAll();
+        currentPrd.value = body.prd_id;
+      } catch (e) { ElMessage.error(e.message); }
+      finally { busy.value = false; }
+    };
+
+    const submitPaste = async () => {
+      busy.value = true;
+      try {
+        const body = await api('/api/prds', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prd_id: pasteId.value, text: pasteText.value }),
+        });
+        ElMessage.success(`已保存 ${body.prd_id}：${body.stats.chars} 字 / ${body.stats.chunks} 块`);
+        pasteVisible.value = false;
+        await refreshAll();
+        currentPrd.value = body.prd_id;
+      } catch (e) { ElMessage.error('保存失败：' + e.message); }
+      finally { busy.value = false; }
+    };
+
+    const catText = (c) => CAT_TEXT[c] || c;
+    const catType = (c) => CAT_TYPE[c] || 'info';
+    const statusText = (s) => STATUS_TEXT[s] || s;
+    const stageText = (s) => STAGE_TEXT[s] || s;
+
+    onMounted(refreshAll);
+
+    return {
+      health, prds, runs, run, llmCalls, currentPrd, mode, busy, tab,
+      pasteVisible, pasteId, pasteText,
+      refreshAll, loadRun, startRun, mapRows, editableMap, pointRows, caseRows,
+      addRule, submitTestmap, acceptDraft, adopt, verdictOf, exportXlsx, doUpload, submitPaste,
+      catText, catType, statusText, stageText,
+    };
+  },
+}).use(ElementPlus).mount('#app');
+</script>
+</body>
+</html>

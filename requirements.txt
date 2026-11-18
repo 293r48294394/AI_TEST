@@ -1,0 +1,15 @@
+# 本项目刻意把运行时依赖压到接近零：
+#   后端框架 fastapi/uvicorn、数据校验 pydantic、导出 openpyxl 为必需；
+#   其余（LLM HTTP、docx 解析、检索、去重、指标）全部用标准库实现。
+# 这样做的原因见 README「环境约束」：受限机器上 pip 不可用，装不上的依赖等于交付不了。
+fastapi>=0.110
+uvicorn>=0.27
+pydantic>=2.5
+openpyxl>=3.1
+
+# 开发/测试
+pytest>=7.4
+
+# 可选（缺省时对应功能会明确降级并给出提示，不会静默失败）：
+#   pdfplumber>=0.10   # 解析 PDF 版 PRD
+#   python-docx        # 不需要：本仓库用 stdlib zip+xml 解析 docx

@@ -1,0 +1,23 @@
+# 运行产物：每次运行一个目录，体积大且含 PRD 内容，不入库
+data/runs/
+reports/*.json
+
+# 测试临时目录
+tests/_work/
+.pytest_tmp/
+.pytest_cache/
+
+# 环境与密钥
+.env
+*.key
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.deps/
+*.egg-info/
+
+# 编辑器
+.vscode/
+.idea/

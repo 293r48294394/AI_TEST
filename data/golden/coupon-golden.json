@@ -1,0 +1,428 @@
+{
+  "prd_id": "coupon-center-v1.4",
+  "version": "v0",
+  "annotator": "human",
+  "annotation_note": "由人类测试工程师逐条确认的基准测试点；AI 未参与生成。",
+  "test_points": [
+    {
+      "id": "G-001",
+      "feature": "优惠券创建",
+      "category": "normal",
+      "title": "创建满100减20、全场、公开领取券模板成功入库",
+      "expectation": "返回 couponId 与状态「待发布」；表 4-1 字段逐项落库，面额 20.00 元、门槛 100.00 元、发放方式公开领取",
+      "priority": "P1",
+      "source": "PRD 4.1 表 4-1",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-002",
+      "feature": "优惠券创建",
+      "category": "normal",
+      "title": "创建8.5折、指定类目、定向发放券模板成功",
+      "expectation": "折扣率字段存储 0.85，发放方式为定向发放，返回状态「待发布」，适用范围落库为指定类目",
+      "priority": "P2",
+      "source": "PRD 4.1 表 4-1",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-003",
+      "feature": "优惠券创建",
+      "category": "normal",
+      "title": "创建立减5元券时门槛被固定为0.00",
+      "expectation": "接口忽略传入的门槛值，落库门槛 0.00 元，券类型为立减，创建成功且前端无门槛输入框",
+      "priority": "P1",
+      "source": "PRD 4.1 条款 4.1.2",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-004",
+      "feature": "用户领取",
+      "category": "normal",
+      "title": "领取公开券成功时库存由100变为99并生成未使用券",
+      "expectation": "返回用户券 ID，库存余量 99，用户券状态「未使用」，coupon_receive 上报 stock_before=100、stock_after=99",
+      "priority": "P1",
+      "source": "PRD 4.2 条款 4.2.1",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-005",
+      "feature": "用户领取",
+      "category": "normal",
+      "title": "输入12位兑换码兑换成功后码状态变为已使用",
+      "expectation": "生成用户券，码状态「已使用」，同一用户再次输入同码返回已兑换，库存仅扣减 1",
+      "priority": "P2",
+      "source": "PRD 4.2 条款 4.2.4",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-006",
+      "feature": "下单使用",
+      "category": "normal",
+      "title": "满100减20券对120元订单试算抵扣20元",
+      "expectation": "试算返回商品券抵扣 2000 分、应付 10000 分，页面展示 100.00 元，优惠明细中券抵扣为 20.00 元",
+      "priority": "P1",
+      "source": "PRD 4.3 条款 4.3.2",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-007",
+      "feature": "下单使用",
+      "category": "normal",
+      "title": "满100减20商品券与8元运费券叠加时先算商品券再算运费券",
+      "expectation": "20元商品券先抵扣，8元运费券再抵扣运费，应付=100.00+0.00；运费券抵扣不改变商品券抵扣额，coupon_use 记录两笔",
+      "priority": "P1",
+      "source": "PRD 4.3 表 4-3 脚注②",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-008",
+      "feature": "支付与核销",
+      "category": "normal",
+      "title": "订单支付成功后券状态由未使用变为已使用",
+      "expectation": "券状态「已使用」，核销流水含 order_id 与 verify_time，coupon_verify 埋点上报 verify_time",
+      "priority": "P1",
+      "source": "PRD 4.4 条款 4.4.1",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-009",
+      "feature": "订单关闭",
+      "category": "normal",
+      "title": "30分钟未支付自动关单后券恢复为未使用",
+      "expectation": "订单状态「已关闭」，用户券状态「未使用」，券有效期保持原值不延长，支付流水为空",
+      "priority": "P1",
+      "source": "PRD 4.5 条款 4.5.1",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-010",
+      "feature": "过期与失效",
+      "category": "normal",
+      "title": "券到期后5分钟内被置为已过期并退出可用列表",
+      "expectation": "券状态「已过期」，结算页可用券列表不再返回该券，券详情展示「已过期」标签",
+      "priority": "P2",
+      "source": "PRD 4.6 条款 4.6.1",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-011",
+      "feature": "权限",
+      "category": "normal",
+      "title": "平台运营创建并发布满200减30全场平台券成功",
+      "expectation": "接口返回 200，券状态「已发布」，券在用户端公开可领，其他角色无该创建入口",
+      "priority": "P1",
+      "source": "PRD 3 表 3-1",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-012",
+      "feature": "数据埋点",
+      "category": "normal",
+      "title": "领取成功埋点携带库存前后值且差值为1",
+      "expectation": "coupon_receive 的 stock_before=100、stock_after=99，差值等于 1，ext 无缺失字段，无埋点异常告警",
+      "priority": "P2",
+      "source": "PRD 7 表 7-1 说明③",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-013",
+      "feature": "用户领取",
+      "category": "exception",
+      "title": "库存为0时领取返回COUPON_SOLD_OUT",
+      "expectation": "返回错误码 COUPON_SOLD_OUT，提示「来晚了，已被领完」，库存仍为 0，不产生 coupon_receive 埋点",
+      "priority": "P0",
+      "source": "PRD 4.2 条款 4.2.2",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-014",
+      "feature": "用户领取",
+      "category": "exception",
+      "title": "活动开始前1秒领取返回COUPON_NOT_STARTED",
+      "expectation": "返回 COUPON_NOT_STARTED，库存不扣减，coupon_receive_blocked 的 reason=NOT_STARTED",
+      "priority": "P0",
+      "source": "PRD 4.2 条款 4.2.3",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-015",
+      "feature": "下单使用",
+      "category": "exception",
+      "title": "同时勾选8.5折券与满100减20券提交返回COUPON_CONFLICT",
+      "expectation": "返回 COUPON_CONFLICT，第二张券置灰不可选，订单抵扣金额与选券前一致",
+      "priority": "P1",
+      "source": "PRD 4.3 表 4-3 脚注②",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-016",
+      "feature": "支付与核销",
+      "category": "exception",
+      "title": "同一券同一订单重复核销返回COUPON_ALREADY_VERIFIED",
+      "expectation": "第二次请求返回 COUPON_ALREADY_VERIFIED，核销流水仍为 1 条，券状态与核销时间不变",
+      "priority": "P0",
+      "source": "PRD 4.4 条款 4.4.2",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-017",
+      "feature": "支付与核销",
+      "category": "exception",
+      "title": "整单退款后已核销券不返还且状态保持已使用",
+      "expectation": "退款成功，券状态仍「已使用」，用户券列表无新增，coupon_refund 的 return_amount=0.00",
+      "priority": "P0",
+      "source": "PRD 4.4 表 4-4 行「整单退款」",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-018",
+      "feature": "订单关闭",
+      "category": "exception",
+      "title": "支付超时关单回调重复投递时库存只回滚一次",
+      "expectation": "第二次回调返回首次结果，库存仅 +1，库存流水与关单流水各 1 条，无重复释放",
+      "priority": "P0",
+      "source": "PRD 1.1 版本记录 v1.4 修订说明③",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-019",
+      "feature": "订单关闭",
+      "category": "exception",
+      "title": "用户主动取消订单只退券不回滚库存",
+      "expectation": "券状态「未使用」，Redis 库存不变，订单「已取消」，差异由次日 02:00 对账修正至可用余量",
+      "priority": "P1",
+      "source": "PRD 1.1 版本记录 v1.4 修订说明③",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-020",
+      "feature": "过期与失效",
+      "category": "exception",
+      "title": "使用已过期券提交订单返回COUPON_EXPIRED",
+      "expectation": "返回 COUPON_EXPIRED，订单不创建，不产生核销流水与 coupon_use 埋点",
+      "priority": "P1",
+      "source": "PRD 4.6 条款 4.6.2",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-021",
+      "feature": "权限",
+      "category": "exception",
+      "title": "商家调用平台券创建接口返回403 ROLE_FORBIDDEN",
+      "expectation": "HTTP 403，错误码 ROLE_FORBIDDEN，券模板不落库，产生越权审计日志",
+      "priority": "P0",
+      "source": "PRD 3 表 3-1 脚注",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-022",
+      "feature": "优惠券创建",
+      "category": "exception",
+      "title": "折扣率0.70低于下限0.80时创建失败",
+      "expectation": "返回 COUPON_DISCOUNT_INVALID，券模板不落库，提示折扣范围为 0.80–0.99",
+      "priority": "P1",
+      "source": "PRD 4.1 条款 4.1.3",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-023",
+      "feature": "数据埋点",
+      "category": "exception",
+      "title": "核销埋点超过5秒未上报被对账标记并告警",
+      "expectation": "该核销记录进入每日对账「埋点缺失」清单并触发告警，券状态保持「已使用」不回滚",
+      "priority": "P1",
+      "source": "PRD 7 表 7-1 说明③",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-024",
+      "feature": "下单使用",
+      "category": "boundary",
+      "title": "满100减20券对99.99元订单不可用",
+      "expectation": "券置灰，提示「差 0.01 元可用」，抵扣 0.00，应付 99.99，门槛判定不因浮点误差放行",
+      "priority": "P1",
+      "source": "PRD 4.3 表 4-3 脚注③",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-025",
+      "feature": "下单使用",
+      "category": "boundary",
+      "title": "订单金额恰好100.00元时满100减20券可用",
+      "expectation": "试算通过，抵扣 20.00，应付 80.00，不返回门槛不足提示，优惠明细显示已满足门槛",
+      "priority": "P0",
+      "source": "PRD 4.3 表 4-3 脚注③",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-026",
+      "feature": "下单使用",
+      "category": "boundary",
+      "title": "订单金额100.01元时满100减20券可用且实付80.01",
+      "expectation": "抵扣 20.00，应付 80.01，按 BigDecimal 比较判定达标，金额展示保留两位小数",
+      "priority": "P1",
+      "source": "PRD 4.3 表 4-3 脚注③",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-027",
+      "feature": "下单使用",
+      "category": "boundary",
+      "title": "10.01元订单使用8.5折券应付8.51元",
+      "expectation": "折扣金额 1.50，应付 8.51（8.5085 按 HALF_UP 保留两位），不得出现 8.50 或 8.5085",
+      "priority": "P1",
+      "source": "PRD 5 表 5-1 脚注⑥",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-028",
+      "feature": "用户领取",
+      "category": "boundary",
+      "title": "累计已领3张的用户第4次领取同一券模板被拦截",
+      "expectation": "返回 COUPON_LIMIT_EXCEEDED，提示已达限领上限，库存不变，coupon_receive_blocked 的 reason=USER_LIMIT",
+      "priority": "P0",
+      "source": "PRD 4.2 表 4-2 脚注①",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-029",
+      "feature": "用户领取",
+      "category": "boundary",
+      "title": "持有3张含1张客服补偿券的用户可领取第4张",
+      "expectation": "本次领取成功，库存 -1，用户券共 4 张，限领计数仍为 3，补偿券不占额度",
+      "priority": "P1",
+      "source": "PRD 4.2 表 4-2 脚注①",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-030",
+      "feature": "用户领取",
+      "category": "boundary",
+      "title": "活动开始前1秒与开始当秒的领取结果相反",
+      "expectation": "T-1s 返回 COUPON_NOT_STARTED 且库存不变；T 时刻领取成功且库存 -1",
+      "priority": "P1",
+      "source": "PRD 4.2 条款 4.2.3",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-031",
+      "feature": "过期与失效",
+      "category": "boundary",
+      "title": "有效期23:59:59当秒可用、次日00:00:00失效",
+      "expectation": "23:59:59 试算通过并可下单；00:00:00 返回 COUPON_EXPIRED；判定时区为 Asia/Shanghai",
+      "priority": "P1",
+      "source": "PRD 5 表 5-1 脚注⑤",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-032",
+      "feature": "支付与核销",
+      "category": "boundary",
+      "title": "实付100元、优惠20元订单部分退款33.33元返还6.67元",
+      "expectation": "返还 6.67 元入余额（20×33.33÷100=6.666 按 HALF_UP），不重新发券，coupon_refund 记录 return_amount=6.67",
+      "priority": "P0",
+      "source": "PRD 4.4 表 4-4 脚注④",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-033",
+      "feature": "订单关闭",
+      "category": "boundary",
+      "title": "支付超时到30:00触发关单并释放库存",
+      "expectation": "29:59 仍可支付；30:00 关单，库存 +1，券恢复「未使用」，订单状态「已关闭」",
+      "priority": "P0",
+      "source": "PRD 1.1 版本记录 v1.4 修订说明③",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-034",
+      "feature": "下单使用",
+      "category": "boundary",
+      "title": "一单选择2张商品券加1张运费券被拒",
+      "expectation": "返回 COUPON_COUNT_EXCEEDED，数量上限优先于互斥校验、不进入互斥判定；仅保留 1 张商品券 + 1 张运费券，应付金额回到该组合的试算值",
+      "priority": "P1",
+      "source": "PRD 4.3 条款 4.3.5",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-035",
+      "feature": "用户领取",
+      "category": "security",
+      "title": "同一兑换码第501次全局兑换返回CODE_EXHAUSTED",
+      "expectation": "前 500 次兑换成功，第 501 次返回 CODE_EXHAUSTED，库存不再扣减，记录风控事件",
+      "priority": "P0",
+      "source": "PRD 9 待定问题 Q2 答复",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-036",
+      "feature": "权限",
+      "category": "security",
+      "title": "商家创建预算超过保证金20%的店铺券被拒",
+      "expectation": "返回 BUDGET_EXCEEDED，券模板不落库，预算校验在提交时执行并提示超限比例",
+      "priority": "P1",
+      "source": "PRD 3 表 3-1 脚注",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-037",
+      "feature": "用户领取",
+      "category": "security",
+      "title": "篡改userId领取他人定向券返回403",
+      "expectation": "HTTP 403，不生成用户券，库存不变，记录风控事件与请求 IP",
+      "priority": "P0",
+      "source": "PRD 4.2 条款 4.2.5",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-038",
+      "feature": "支付与核销",
+      "category": "security",
+      "title": "使用旧nonce重放核销请求返回REPLAY_REJECTED",
+      "expectation": "返回 REPLAY_REJECTED，不新增核销流水，券状态保持首次核销结果",
+      "priority": "P1",
+      "source": "PRD 4.4 条款 4.4.3",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-039",
+      "feature": "过期与失效",
+      "category": "compat",
+      "title": "UTC-5时区用户端显示10:59:59而判定按服务端时区",
+      "expectation": "券详情按本地时区展示 10:59:59，服务端在 Asia/Shanghai 23:59:59 前判定可用，不出现提前失效",
+      "priority": "P2",
+      "source": "PRD 5 表 5-1 脚注⑤",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-040",
+      "feature": "下单使用",
+      "category": "compat",
+      "title": "小程序、H5、APP三端同一订单试算金额一致",
+      "expectation": "三端均返回应付 80.01 元且展示两位小数，无前端二次取整导致的 0.01 元差异",
+      "priority": "P2",
+      "source": "PRD 4.3 条款 4.3.6",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-041",
+      "feature": "用户领取",
+      "category": "performance",
+      "title": "5000QPS抢1000张库存不超卖且P99不超过200ms",
+      "expectation": "成功领取恰好 1000 次，其余返回 COUPON_SOLD_OUT，库存最终为 0 且无负数，P99 ≤ 200ms",
+      "priority": "P0",
+      "source": "PRD 6 条款 6.1",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-042",
+      "feature": "支付与核销",
+      "category": "performance",
+      "title": "1万笔核销在5分钟内完成且失败率低于0.01%",
+      "expectation": "批量核销耗时 ≤ 300s，失败笔数 < 1，失败记录全部进入重试队列，无重复核销流水",
+      "priority": "P1",
+      "source": "PRD 6 条款 6.3",
+      "implicit_rule": false
+    }
+  ]
+}
