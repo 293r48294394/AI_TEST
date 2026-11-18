@@ -2,16 +2,16 @@
 
 > ⚠️ 本次为**离线启发式基线**（未调用真实模型），数字仅证明链路与指标可用，**不代表模型能力**。跑真实对比请设 `ATP_LLM_MODE=deepseek` 并配置 key。
 
-- 开始时间：2026-11-18T17:57:20+08:00
-- 基准集：`E:\deepseek\项目\ai-testcase-platform\data\golden\coupon-golden.json`
+- 开始时间：2026-11-18T17:58:26+08:00
+- 基准集：`coupon-golden.json`
 - Fidelity 判定方式：**启发式代理**（只看关键数字是否带入，属保守下限）
 
 ## 三种模式对比
 
 | 模式 | 测试点 | 用例 | 场景召回 Match Rate | Precision | F1 | **隐性规则召回** | Fidelity(≥4) | 评审分 | 闸门 | 耗时 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| bare | 34 | 34 | 2.4% | 2.9% | 0.026 | **0.0%** (0/20) | 0.0% | 65 | revise | 0.0s |
-| rag | 26 | 26 | 2.4% | 3.9% | 0.029 | **0.0%** (0/20) | 0.0% | 81 | pass | 0.0s |
+| bare | 34 | 34 | 2.4% | 2.9% | 0.026 | **0.0%** (0/20) | 0.0% | 65 | revise | 0.1s |
+| rag | 26 | 26 | 2.4% | 3.9% | 0.029 | **0.0%** (0/20) | 0.0% | 81 | pass | 0.1s |
 | rag_hitl | 26 | 26 | 2.4% | 3.9% | 0.029 | **0.0%** (0/20) | 0.0% | 81 | pass | 0.1s |
 
 ## 格式与成本
@@ -121,9 +121,9 @@
 ## 复现方式
 
 ```bash
-$env:ATP_LLM_MODE='deepseek'   # 或 mock
-python run.py eval --prd coupon-center-prd --golden data/golden/coupon-golden.json
+$env:ATP_LLM_MODE='mock'
+python run.py eval --prd coupon-center-prd --golden data/golden/coupon-golden.json --sweep
 ```
 
-> 指标定义：Match Rate = 命中的基准点 / 基准点总数（一对一贪心匹配，阈值 0.55）；
-> Fidelity = 命中对中约束数字/状态被正确带入的比例（本轮为启发式代理，接入 LLM judge 后改为 1–5 分制）。
+> 指标定义：Match Rate = 命中的基准点 / 基准点总数（一对一贪心匹配，默认阈值 0.55，敏感性见上表）；
+> Fidelity = 启发式代理：命中对里关键数字/状态是否被带入，属保守下限，接入 `--judge llm` 后改为 1–5 分制。

@@ -227,7 +227,8 @@ def render_markdown(ev: Evaluation) -> str:
         banner,
         "",
         f"- 开始时间：{ev.started_at}",
-        f"- 基准集：`{ev.golden_path}`",
+        # 只展示文件名：仓库里不落本机绝对路径
+        f"- 基准集：`{Path(ev.golden_path).name if ev.golden_path else '-'}`",
         f"- Fidelity 判定方式：**{judge_label}**"
         + ("（1–5 分制，≥4 记为忠实）" if judge_kind == "llm" else "（只看关键数字是否带入，属保守下限）"),
         "",
