@@ -137,3 +137,48 @@ def test_template_lists_all_ids_without_default_verdict():
     # 模板本身不应包含可直接解析的判定，避免"一键全通过"
     verdicts, errors = parse_verdicts(text)
     assert not verdicts
+
+
+def test_read_xlsx_verdicts(workdir):
+    """人在 Excel 里填也是合法输入 —— 工具要迁就人的习惯。"""
+    from openpyxl import Workbook
+
+    from atp.eval.review import read_verdicts
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "复核"
+    ws.append(["ID", "类别", "标题", "结论", "修改内容（结论=改 时填）"])
+    ws.append(["G-001", "normal", "创建满100减20券成功", "通过", ""])
+    ws.append(["G-002", "boundary", "第 4 次领取被拦截", "改", "分类=exception; 期望=HTTP 400，提示已达上限"])
+    info = wb.create_sheet("说明")
+    info["A1"], info["B1"] = "复核人", "张三"
+    path = workdir / "review.xlsx"
+    wb.save(path)
+
+    verdicts, annotator, errors = read_verdicts(path)
+    assert not errors, errors
+    assert annotator == "张三", "复核人应来自『说明』页 B1，命令行没给时用它"
+    assert verdicts["G-001"].status == "通过"
+    assert verdicts["G-002"].status == "改"
+    assert verdicts["G-002"].fields["category"] == "exception"
+
+
+def test_xlsx_reports_bad_rows(workdir):
+    from openpyxl import Workbook
+
+    from atp.eval.review import read_verdicts
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "复核"
+    ws.append(["ID", "结论", "修改内容（结论=改 时填）"])
+    ws.append(["G-001", "也许可以", ""])
+    ws.append(["G-002", "改", ""])
+    path = workdir / "bad.xlsx"
+    wb.save(path)
+    verdicts, _, errors = read_verdicts(path)
+    assert not verdicts
+    assert len(errors) == 2
+    assert any("结论非法" in e for e in errors)
+    assert any("修改内容" in e for e in errors)

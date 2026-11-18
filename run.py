@@ -233,8 +233,7 @@ def cmd_batch(args) -> int:
 
 
 def cmd_review_apply(args) -> int:
-    from atp.eval.golden_lint import lint
-    from atp.eval.review import apply_verdicts, load_doc, parse_verdicts, render_template, save_doc
+    from atp.eval.review import apply_with_gate, load_doc, read_verdicts, render_template, save_doc
     from atp.parsers.prd import parse_file
 
     settings = _settings()
@@ -258,28 +257,15 @@ def cmd_review_apply(args) -> int:
     if not verdicts_path.exists():
         print(f"[error] 找不到复核文件：{verdicts_path}（先加 --template 生成）", file=sys.stderr)
         return 2
-    verdicts, parse_errors = parse_verdicts(verdicts_path.read_text(encoding="utf-8"))
+    verdicts, sheet_annotator, parse_errors = read_verdicts(verdicts_path)
     if parse_errors:
         print("[error] 录入格式有问题：", file=sys.stderr)
         for e in parse_errors[:10]:
             print("  x " + e, file=sys.stderr)
         return 2
 
-    annotator = args.annotator.strip() or "未署名"
-    rows, report = apply_verdicts(
-        doc["test_points"], verdicts, annotator=annotator, version=args.version, allow_partial=args.partial
-    )
-    print(f"[review] {report.summary()}")
-    print(f"  通过: {report.passed[:8]}{'…' if len(report.passed) > 8 else ''}")
-    print(f"  修改: {report.edited or '-'}")
-    print(f"  删除: {report.deleted or '-'}")
-    if report.errors:
-        print("[error] 应用失败（未写入任何文件）：", file=sys.stderr)
-        for e in report.errors[:10]:
-            print("  x " + e, file=sys.stderr)
-        return 1
-
-    # 先在内存副本上跑质检，0 error 才允许落盘
+    # xlsx 的复核人写在「说明」页，命令行没给就用它
+    annotator = args.annotator.strip() or sheet_annotator or "未署名"
     prd_path = Path(args.prd)
     if not prd_path.exists():
         for suffix in (".md", ".docx", ".txt"):
@@ -291,7 +277,21 @@ def cmd_review_apply(args) -> int:
         print(f"[error] 找不到 PRD：{args.prd}", file=sys.stderr)
         return 2
     prd = parse_file(prd_path, prd_id=prd_path.stem)
-    lint_report = lint(prd, rows)
+
+    # 应用 + 质检闸门只有一处实现（apply_with_gate），txt/xlsx 两条入口共用
+    rows, report, lint_report = apply_with_gate(
+        prd=prd, doc=doc, verdicts=verdicts, annotator=annotator, version=args.version, allow_partial=args.partial
+    )
+    print(f"[review] {report.summary()}")
+    print(f"  通过: {report.passed[:8]}{'…' if len(report.passed) > 8 else ''}")
+    print(f"  修改: {report.edited or '-'}")
+    print(f"  删除: {report.deleted or '-'}")
+    if not report.ok:
+        print("[error] 应用失败（未写入任何文件）：", file=sys.stderr)
+        for e in report.errors[:10]:
+            print("  x " + e, file=sys.stderr)
+        return 1
+
     print(f"[lint] {len(rows)} 条 → error {len(lint_report.errors)} / warn {len(lint_report.warns)}")
     if report.deleted and any(w.code == "schema.id_sequence" for w in lint_report.warns):
         print("  注意：有删除，编号不连续属正常（warn 不阻断评测）。")

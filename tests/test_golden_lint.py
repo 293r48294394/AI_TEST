@@ -116,6 +116,12 @@ def test_implicit_flag_consistency():
     assert "implicit.missing_flag" in codes2
 
 
+def test_implicit_with_mixed_source_is_not_flagged():
+    """出处同时引条款与脚注时不该告警：规则来自脚注、错误码来自条款，是正常写法。"""
+    rep = lint(_prd(), [_row(implicit_rule=True, source="PRD 4.1 条款 4.1.1 表 4-1 脚注①")])
+    assert not any(i.code == "implicit.source_is_clause" for i in rep.issues)
+
+
 def test_shipped_golden_set_is_clean():
     """仓库里这份基准集必须零 error —— 这是它能不能被引用的前提。"""
     root = Path(__file__).resolve().parent.parent

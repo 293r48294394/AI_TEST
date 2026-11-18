@@ -95,6 +95,7 @@ def parse_verdicts(text: str) -> tuple[dict[str, Verdict], list[str]]:
             fields = _parse_fields(rest)
             if not fields:
                 errors.append(f"{gid} 标为『改』但没写要改哪些字段（格式：标题=xxx; 期望=xxx）")
+                continue
             verdict.fields = fields
             verdict.note = fields.pop("note", "")
         verdicts[gid] = verdict
@@ -121,6 +122,20 @@ def _parse_fields(rest: str) -> dict:
         else:
             out[target] = value
     return out
+
+
+def read_verdicts(path: Path) -> tuple[dict[str, Verdict], str, list[str]]:
+    """统一入口：按扩展名分派，返回 (verdicts, annotator, errors)。
+
+    xlsx 的解析只有一份实现（review_xlsx.read_verdicts_xlsx），这里只做分派——
+    两套解析器必然漂移，xlsx 里填的和 txt 里读的行为不一致是最难查的 bug。
+    """
+    if path.suffix.lower() in {".xlsx", ".xlsm"}:
+        from .review_xlsx import read_verdicts_xlsx
+
+        return read_verdicts_xlsx(path)
+    verdicts, errors = parse_verdicts(path.read_text(encoding="utf-8"))
+    return verdicts, "", errors
 
 
 def apply_verdicts(

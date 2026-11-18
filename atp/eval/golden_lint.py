@@ -141,9 +141,14 @@ def lint(prd: ParsedPRD, rows: list[dict], *, dup_threshold: float = 0.92) -> Li
         gid = str(row.get("id", "?"))
         src = str(row.get("source", ""))
         implicit = bool(row.get("implicit_rule"))
-        if implicit and "条款" in src:
+        if implicit and "条款" in src and not any(k in src for k in ("脚注", "表", "待定", "修订", "说明")):
             rep.issues.append(
-                LintIssue("warn", "implicit.source_is_clause", gid, f"标为隐性规则，但出处是正文条款：{src!r}（可能标错）")
+                LintIssue(
+                    "warn",
+                    "implicit.source_is_clause",
+                    gid,
+                    f"标为隐性规则，但出处只有正文条款：{src!r}（可能标错，或该补脚注/表格出处）",
+                )
             )
         if not implicit and MARKERS and any(m in src for m in MARKERS):
             rep.issues.append(
