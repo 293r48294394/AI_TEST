@@ -17,13 +17,13 @@
 | 基准集质检（14 条规则） | 完成 | `python run.py lint-golden ...` |
 | 跨文档泛化（2 份 PRD） | 完成 | `pytest tests/test_cross_domain.py` |
 | 批量并发 + 成本核算 | 完成 | `python run.py batch ...` / `cost --run` |
-| 测试 | **102 passed** | `python -m pytest` |
+| 测试 | `python -m pytest` 全绿（当前 105 个） | `python -m pytest` |
 | 一键验证 | 6 步全绿 | `python scripts/verify.py` |
 
-**未完成的只有两件，都需要你本人参与**：
+**未完成的只剩一件**：没有真实模型数字 → README 里的表是离线基线，不代表模型能力。
 
-1. 42 条基准集尚未人工复核 → 现在只能叫"AI 起草 + 机器质检"，不能叫"人工标注"；
-2. 没有真实模型数字 → README 里的表是离线基线，不代表模型能力。
+基准集已于 2026-11-18 人工复核完成（屈永康：39 通过 / 3 修正，机器质检 0 error），
+证据在 `docs/examples/golden-review-applied.diff`，不再需要重复复核。
 
 ## 二、你回来后的四条命令
 
@@ -50,8 +50,9 @@ python scripts/verify.py
 
 | 需要 | 用途 | 给完之后会发生什么 |
 |---|---|---|
-| 基准集复核结论（42 条逐条） | 把"AI 起草"变成"人工标注" | 改 `annotator`/`version`，lint 仍须 0 error |
 | `LLM_API_KEY`（写进 `.env`） | 真实三模式评测 | 替换 README 那张表、跑 `--judge llm`、做致率抽检 |
+
+（基准集复核已完成，这一项不再需要你做。）
 
 ## 四、数字都在哪
 
@@ -67,6 +68,6 @@ python scripts/verify.py
 ## 五、不要做的事
 
 1. **不要把 mock 数字写进简历**（2.4% 召回会让人以为项目没用，其实是基线没用）；
-2. **不要跳过基准集复核就写"人工标注"**——被追问"谁标的、怎么保证"时会崩；
+2. **不要在没有复核记录的情况下声称"人工标注"**——本项目已有 diff 证据；换 PRD 时要重新走一遍 `docs/review-guide.md`；
 3. **不要填估算的采纳率**——没有分母就没有这个指标；
 4. 不要把 `ATP_LLM_MODE` 留在 `deepseek` 就提交 `data/runs/`（含 PRD 全文，已在 gitignore，但别改）。

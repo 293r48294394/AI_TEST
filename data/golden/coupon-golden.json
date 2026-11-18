@@ -1,8 +1,8 @@
 {
   "prd_id": "coupon-center-v1.4",
-  "version": "v0",
-  "annotator": "human",
-  "annotation_note": "由人类测试工程师逐条确认的基准测试点；AI 未参与生成。",
+  "version": "v1.0",
+  "annotator": "屈永康",
+  "annotation_note": "42 条由 AI 依据 PRD 起草，屈永康于 2026-11-18 逐条复核：39 条通过、3 条修正（G-015 补错误码出处并去除无依据的 UI 断言；G-024 去除无依据的 UI 断言；G-035 分类 security→boundary），机器质检 0 error / 0 warn。",
   "test_points": [
     {
       "id": "G-001",
@@ -149,9 +149,9 @@
       "feature": "下单使用",
       "category": "exception",
       "title": "同时勾选8.5折券与满100减20券提交返回COUPON_CONFLICT",
-      "expectation": "返回 COUPON_CONFLICT，第二张券置灰不可选，订单抵扣金额与选券前一致",
+      "expectation": "提交返回 COUPON_CONFLICT，订单抵扣金额与选券前一致，不产生 coupon_use 记录",
       "priority": "P1",
-      "source": "PRD 4.3 表 4-3 脚注②",
+      "source": "PRD 4.3 条款 4.3.5 表 4-3 脚注②",
       "implicit_rule": true
     },
     {
@@ -239,7 +239,7 @@
       "feature": "下单使用",
       "category": "boundary",
       "title": "满100减20券对99.99元订单不可用",
-      "expectation": "券置灰，提示「差 0.01 元可用」，抵扣 0.00，应付 99.99，门槛判定不因浮点误差放行",
+      "expectation": "试算返回该券不可用、抵扣 0.00、应付 99.99，不因浮点误差放行",
       "priority": "P1",
       "source": "PRD 4.3 表 4-3 脚注③",
       "implicit_rule": true
@@ -347,7 +347,7 @@
     {
       "id": "G-035",
       "feature": "用户领取",
-      "category": "security",
+      "category": "boundary",
       "title": "同一兑换码第501次全局兑换返回CODE_EXHAUSTED",
       "expectation": "前 500 次兑换成功，第 501 次返回 CODE_EXHAUSTED，库存不再扣减，记录风控事件",
       "priority": "P0",
@@ -424,5 +424,6 @@
       "source": "PRD 6 条款 6.3",
       "implicit_rule": false
     }
-  ]
+  ],
+  "review_status": "human-reviewed"
 }

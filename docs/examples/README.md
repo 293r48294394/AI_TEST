@@ -7,6 +7,7 @@
 |---|---|---|
 | `hitl-diff-example.json` | 运行 `20261118-a829f1`（`rag_hitl` 模式，mock 基线） | 人工确认时改了测试地图：新增 1 个功能（F-99 券预算控制）、在 F-01 里补了 1 条规则。这就是"人工确认"留下的可审计痕迹 |
 | `review-example.json` | 同一运行的 `05_review.json` | 评审报告：分数、闸门、逐条 issue |
+| `golden-review-applied.diff` | 基准集人工复核落盘时的 git diff | 39 条通过 / 3 条修正 + `annotator` 变更，是"人工标注"最直接的证据 |
 
 注意：`data/runs/` 在 `.gitignore` 里（体积大、含完整 PRD 内容），所以真实运行记录不进仓库，
 只在这里保留两个脱敏示例。想自己生成同样的产物：

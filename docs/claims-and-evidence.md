@@ -34,7 +34,7 @@
 | 声称 | 证据 | 复现 | 强度 |
 |---|---|---|---|
 | 三模式对比评测器 | `atp/eval/runner.py` | `python run.py eval ...` | 强（机制） |
-| 42 条基准集（20 条隐性规则） | `data/golden/coupon-golden.json` | `python run.py lint-golden ...` | 中（**未经人工复核**） |
+| 42 条基准集（20 条隐性规则） | `data/golden/coupon-golden.json`、`docs/examples/golden-review-applied.diff` | `python run.py lint-golden ...` | 强（已人工复核：39 通过 / 3 修正；单一复核人，无 κ 一致性） |
 | 基准集机器质检 0 error | `atp/eval/golden_lint.py`、`tests/test_golden_lint.py` | 同左 | 强 |
 | Match Rate 2.4% | `reports/eval-coupon-center-prd-*.md` | `python run.py eval ...` | **弱**（仅离线基线） |
 | 隐性规则召回 0/20 | 同上 | 同上 | **弱**（仅离线基线） |
