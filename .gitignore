@@ -24,3 +24,9 @@ __pycache__/
 # 编辑器
 .vscode/
 .idea/
+
+# 本地排查用的临时产物
+.chrome-err.txt
+.dom.html
+.chrome-prof/
+.uitest/
