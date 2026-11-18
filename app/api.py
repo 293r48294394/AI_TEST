@@ -245,4 +245,9 @@ def index() -> FileResponse:
     page = WEB_DIR / "index.html"
     if not page.exists():
         raise HTTPException(status_code=500, detail="web/index.html 缺失")
-    return FileResponse(page, media_type="text/html; charset=utf-8")
+    # 页面不缓存：改完前端后刷新就能生效，避免"改了没变"的假象
+    return FileResponse(
+        page,
+        media_type="text/html; charset=utf-8",
+        headers={"Cache-Control": "no-store, must-revalidate"},
+    )

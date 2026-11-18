@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>AI 测试用例生成平台 · 控制台</title>
-<link rel="stylesheet" href="/vendor/element-plus.css" />
+<link rel="stylesheet" href="/vendor/element-plus.css?v=2" />
 <style>
   :root {
     --ink: #0f172a; --muted: #64748b; --line: #e2e8f0; --bg: #f6f8fb;
@@ -57,6 +57,39 @@
 </style>
 </head>
 <body>
+<script>
+  /* 启动诊断：任何 JS 错误都直接显示在页面上（白屏时也能看到原因） */
+  window.__bootErrors = [];
+  function __showBootError(msg) {
+    try {
+      var el = document.getElementById('__boot_err');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = '__boot_err';
+        el.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:2147483647;background:#fff3f3;color:#b00020;' +
+          'border-bottom:3px solid #b00020;font:13px/1.6 Consolas,monospace;padding:14px 18px;white-space:pre-wrap;' +
+          'max-height:70vh;overflow:auto';
+        (document.body || document.documentElement).appendChild(el);
+      }
+      el.textContent += (el.textContent ? '\n' : '') + msg;
+    } catch (e) {}
+  }
+  window.addEventListener('error', function (e) {
+    var f = e.filename ? String(e.filename).split('/').pop() : '';
+    var stack = e.error && e.error.stack ? '\n' + e.error.stack.split('\n').slice(0, 4).join('\n') : '';
+    __showBootError('JS 错误: ' + (e.message || '') + (f ? ' @ ' + f + ':' + e.lineno : '') + stack);
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason || {};
+    __showBootError('未处理的 Promise 拒绝: ' + (r.stack || r.message || String(r)));
+  });
+  setTimeout(function () {
+    var app = document.getElementById('app');
+    if (app && app.children.length === 0) {
+      __showBootError('启动超时：#app 仍为空。typeof Vue=' + typeof Vue + '，typeof ElementPlus=' + typeof ElementPlus);
+    }
+  }, 3000);
+</script>
 <div id="app">
   <div class="topbar">
     <div>
@@ -364,8 +397,8 @@
   </el-dialog>
 </div>
 
-<script src="/vendor/vue.global.prod.js"></script>
-<script src="/vendor/element-plus.full.min.js"></script>
+<script src="/vendor/vue.global.prod.js?v=2"></script>
+<script src="/vendor/element-plus.full.min.js?v=2"></script>
 <script>
 const { createApp, ref, computed, onMounted } = Vue;
 const { ElMessage, ElMessageBox } = ElementPlus;
@@ -375,7 +408,7 @@ const CAT_TYPE = { normal: 'primary', exception: 'danger', boundary: 'warning', 
 const STATUS_TEXT = { running: '运行中', awaiting_human: '待人工确认', failed: '失败', completed: '已完成', aborted: '中止' };
 const STAGE_TEXT = { s1_testmap: '① 需求拆解', gate1: '人工确认闸门', s2_testpoints: '② 测试点生成', s3_testcases: '③ 用例生成', s4_review: '④ 质量评审', done: '完成' };
 
-createApp({
+var app = createApp({
   setup() {
     const health = ref({});
     const prds = ref([]);
@@ -561,7 +594,13 @@ createApp({
       catText, catType, statusText, stageText,
     };
   },
-}).use(ElementPlus).mount('#app');
+});
+try {
+  app.use(ElementPlus);
+  app.mount('#app');
+} catch (err) {
+  __showBootError('启动失败：' + (err && (err.stack || err.message)));
+}
 </script>
 </body>
 </html>
