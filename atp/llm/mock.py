@@ -215,6 +215,16 @@ class HeuristicClient(LLMClient):
             suggestions.append("用例总量偏少，建议补充异常与安全类场景")
         return {"suggestions": suggestions[:3], "semantic_issues": []}
 
+    def _task_s5_fidelity_judge(self, payload: dict) -> dict:
+        """离线基线不做语义判断：统一给 3 分，避免把"猜"包装成"评"。"""
+        pairs = payload.get("pairs", [])
+        return {
+            "verdicts": [
+                {"pair_index": i, "score": 3, "reason": "离线基线不提供语义判断"}
+                for i in range(len(pairs))
+            ]
+        }
+
     # ---------------------------------------------------------------- helpers
     @staticmethod
     def _feature_name(heading: str, text: str) -> str:

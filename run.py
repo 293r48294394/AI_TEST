@@ -95,8 +95,15 @@ def cmd_eval(args) -> int:
     if not golden.exists():
         print(f"[error] 找不到基准集：{golden}", file=sys.stderr)
         return 2
-    print(f"[eval] llm_mode={settings.llm_mode} golden={golden}")
-    ev = run_all(settings, args.prd, golden, modes=tuple(args.modes.split(",")))
+    print(f"[eval] llm_mode={settings.llm_mode} golden={golden} judge={args.judge} sweep={args.sweep}")
+    ev = run_all(
+        settings,
+        args.prd,
+        golden,
+        modes=tuple(args.modes.split(",")),
+        judge=args.judge,
+        sweep=args.sweep,
+    )
     report = save_report(ev, ROOT / "reports")
     print(f"[eval] 报告已生成：{report}\n")
     print(report.read_text(encoding="utf-8"))
@@ -154,6 +161,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--prd", required=True)
     p.add_argument("--golden", required=True)
     p.add_argument("--modes", default="bare,rag,rag_hitl")
+    p.add_argument("--judge", default="heuristic", choices=["heuristic", "llm"],
+                   help="llm 需要真实模型（ATP_LLM_MODE=deepseek）")
+    p.add_argument("--sweep", action="store_true", help="附加匹配阈值敏感性分析")
     p.set_defaults(func=cmd_eval)
 
     p = sub.add_parser("list", help="列出 PRD 与运行")

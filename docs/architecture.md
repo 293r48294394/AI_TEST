@@ -101,9 +101,15 @@ gate  = pass 当且仅当 无 blocker 且 score ≥ 75
 | 换编排框架（LangGraph） | 把 `Orchestrator._stage_*` 换成 node | Skill 层不动 |
 | 换导出格式（Xray/TestLink/CSV） | 加 `export/` 实现 | 只影响导出接口 |
 | 换被测文档类型 | `parsers/prd.py` 加分支 | 只影响 PRD 入口 |
+| 换 Fidelity 判定 | `eval/judge.py`（1–5 分）或 `eval/metrics.fidelity_heuristic`（代理） | 报告里的 `fidelity_judge` 字段自动标注 |
+| 换匹配算法 | `eval/metrics.match_points` | 阈值敏感性 `sweep_threshold` 会一并变化 |
 
 ## 7. 前端
 
 单文件 `web/index.html`：Vue 3 + Element Plus（`web/vendor/` 本地化，断网可用）。
 页面职责只有四个：看中间产物、在闸门处改测试地图、逐条裁决、导出。
 不做登录/权限/多租户——那是工程脚手架，不是这个项目的论点。
+
+模板正确性由 `scripts/check_web.js` 保证：用 Vue 编译器在 Node 里编译模板并收集报错。
+没有浏览器也能拦住"页面白屏但 HTTP 200"这类问题（本仓库开发时确实靠它发现并修掉过
+`document is not defined` 的编译环境问题）。

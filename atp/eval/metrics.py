@@ -185,6 +185,35 @@ def _numbers(text: str) -> set[str]:
     return set(re.findall(r"\d+(?:\.\d+)?", text or ""))
 
 
+# --------------------------------------------------------------- 阈值敏感性
+
+
+def sweep_threshold(
+    points: list[TestPoint],
+    golden: list[GoldenPoint],
+    thresholds: tuple[float, ...] = (0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.80),
+) -> list[dict]:
+    """扫匹配阈值，看 Recall/Precision 对阈值有多敏感。
+
+    为什么必须做：0.55 如果正好落在曲线陡峭段，说明结论由阈值决定而不是由方案决定，
+    任何一个数字都不能当结论讲。理想情况是阈值在 0.5–0.7 之间平缓，
+    说明"匹配"这件事本身是稳定的。
+    """
+    rows = []
+    for t in thresholds:
+        res = match_points(points, golden, threshold=t)
+        rows.append(
+            {
+                "threshold": t,
+                "recall": res.recall,
+                "precision": res.precision,
+                "f1": res.f1,
+                "matched": res.matched_golden,
+            }
+        )
+    return rows
+
+
 # ----------------------------------------------------------------- adoption
 
 

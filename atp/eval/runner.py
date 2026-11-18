@@ -24,6 +24,7 @@ from ..pipeline.orchestrator import Orchestrator
 from ..store import RunStore
 from ..util import read_json
 from . import metrics as M
+from .judge import judge_fidelity
 
 MODES = ("bare", "rag", "rag_hitl")
 
@@ -46,6 +47,7 @@ class ModeOutcome:
     llm: dict = field(default_factory=dict)
     duration_ms: int = 0
     hitl: dict = field(default_factory=dict)
+    sweep: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -82,11 +84,13 @@ class Evaluation:
                     "implicit_matched": o.match.implicit_matched,
                     "fidelity_mean": o.fidelity.mean_score,
                     "fidelity_rate": o.fidelity.faithful_rate,
+                    "fidelity_judge": o.fidelity.judge,
                     "adoption": o.adoption,
                     "format": o.fmt,
                     "llm": o.llm,
                     "duration_ms": o.duration_ms,
                     "hitl": o.hitl,
+                    "sweep": o.sweep,
                     "missed": [{"id": g.id, "title": g.title, "source": g.source, "implicit": g.implicit_rule} for g in o.match.missed],
                     "by_category": o.match.by_category,
                 }
@@ -102,6 +106,9 @@ def run_one(
     mode: str,
     golden: list[M.GoldenPoint],
     confirmed_map: TestMap | None = None,
+    *,
+    judge: str = "heuristic",
+    sweep: bool = False,
 ) -> ModeOutcome:
     out = ModeOutcome(mode=mode)
     started = time.perf_counter()
@@ -129,9 +136,24 @@ def run_one(
     out.score = state.review.score if state.review else None
     out.gate = state.review.gate if state.review else ""
     out.match = M.match_points(points, golden)
-    out.fidelity = M.fidelity_heuristic(points, golden, out.match.pairs)
+
+    # Fidelity：真实模型 + judge=llm 时用语义评判；否则用启发式代理（报告里会标明）
+    if judge == "llm" and settings.live_llm:
+        try:
+            client = orc._make_client(state.run_id)  # 复用编排器的客户端（含审计回调）
+            out.fidelity = judge_fidelity(client, settings, points, golden, out.match.pairs)
+        except Exception as exc:
+            out.fidelity = M.fidelity_heuristic(points, golden, out.match.pairs)
+            out.fidelity.details.insert(0, {"error": f"judge 失败，回退启发式：{type(exc).__name__}: {exc}"})
+    else:
+        out.fidelity = M.fidelity_heuristic(points, golden, out.match.pairs)
+
+    if sweep:
+        out.sweep = M.sweep_threshold(points, golden)
+
     out.adoption = M.adoption_stats(state)
     out.fmt = M.format_stats(state)
+    # 放在最后统计，把 judge 的调用与成本一并算进去
     calls = orc.store.llm_calls(state.run_id)
     out.llm = {
         "calls": len(calls),
@@ -149,6 +171,9 @@ def run_all(
     prd_id: str,
     golden_path: Path,
     modes: tuple[str, ...] = MODES,
+    *,
+    judge: str = "heuristic",
+    sweep: bool = False,
 ) -> Evaluation:
     from ..util import now_iso
 
@@ -166,7 +191,7 @@ def run_all(
         started_at=now_iso(),
     )
     for mode in modes:
-        ev.outcomes.append(run_one(orc, settings, prd, mode, golden, confirmed))
+        ev.outcomes.append(run_one(orc, settings, prd, mode, golden, confirmed, judge=judge, sweep=sweep))
     return ev
 
 
@@ -194,6 +219,8 @@ def render_markdown(ev: Evaluation) -> str:
         if live
         else "> ⚠️ 本次为**离线启发式基线**（未调用真实模型），数字仅证明链路与指标可用，**不代表模型能力**。跑真实对比请设 `ATP_LLM_MODE=deepseek` 并配置 key。"
     )
+    judge_kind = ev.outcomes[0].fidelity.judge if ev.outcomes else "heuristic"
+    judge_label = "LLM judge" if judge_kind == "llm" else "启发式代理"
     lines = [
         f"# 评测报告 · {ev.prd_id}",
         "",
@@ -201,6 +228,8 @@ def render_markdown(ev: Evaluation) -> str:
         "",
         f"- 开始时间：{ev.started_at}",
         f"- 基准集：`{ev.golden_path}`",
+        f"- Fidelity 判定方式：**{judge_label}**"
+        + ("（1–5 分制，≥4 记为忠实）" if judge_kind == "llm" else "（只看关键数字是否带入，属保守下限）"),
         "",
         "## 三种模式对比",
         "",
@@ -240,6 +269,23 @@ def render_markdown(ev: Evaluation) -> str:
             cells.append(_pct(row["recall"]) if row else "-")
         lines.append(f"| {o.mode} | " + " | ".join(cells) + " |")
 
+    if any(o.sweep for o in ev.outcomes):
+        lines += [
+            "",
+            "## 阈值敏感性（Match Rate 对匹配阈值的依赖）",
+            "",
+            "> 如果曲线在 0.5–0.7 之间陡降，说明结论由阈值决定，不能当方案效果讲。",
+            "",
+            "| 阈值 | 模式 | 命中数 | Recall | Precision | F1 |",
+            "|---|---|---|---|---|---|",
+        ]
+        for o in ev.outcomes:
+            for row in o.sweep:
+                lines.append(
+                    f"| {row['threshold']:.2f} | {o.mode} | {row['matched']} | {row['recall']:.1%} | "
+                    f"{row['precision']:.1%} | {row['f1']:.3f} |"
+                )
+
     lines += ["", "## 失败分析：人工基准里被漏掉的场景", ""]
     for o in ev.outcomes:
         lines.append(f"### {o.mode}（漏 {len(o.match.missed)}/{o.match.total_golden}）")
@@ -250,16 +296,22 @@ def render_markdown(ev: Evaluation) -> str:
             lines.append(f"- [{tag}] `{g.id}` {g.title}　← {g.source}")
         lines.append("")
 
+    judge_flag = " --judge llm" if live else ""
     lines += [
         "## 复现方式",
         "",
         "```bash",
-        f"$env:ATP_LLM_MODE='deepseek'   # 或 mock",
-        f"python run.py eval --prd {ev.prd_id} --golden data/golden/{Path(ev.golden_path).name}",
+        f"$env:ATP_LLM_MODE='{'deepseek' if live else 'mock'}'\n"
+        f"python run.py eval --prd {ev.prd_id} --golden data/golden/{Path(ev.golden_path).name} --sweep{judge_flag}",
         "```",
         "",
-        "> 指标定义：Match Rate = 命中的基准点 / 基准点总数（一对一贪心匹配，阈值 0.55）；",
-        "> Fidelity = 命中对中约束数字/状态被正确带入的比例（本轮为启发式代理，接入 LLM judge 后改为 1–5 分制）。",
+        "> 指标定义：Match Rate = 命中的基准点 / 基准点总数（一对一贪心匹配，默认阈值 0.55，敏感性见上表）；",
+        "> Fidelity = "
+        + (
+            "LLM judge 按 1–5 分打分，≥4 记为忠实（judge 与人一致率需另行抽检）。"
+            if judge_kind == "llm"
+            else "启发式代理：命中对里关键数字/状态是否被带入，属保守下限，接入 `--judge llm` 后改为 1–5 分制。"
+        ),
     ]
     return "\n".join(lines)
 

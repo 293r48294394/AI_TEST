@@ -51,18 +51,20 @@ PRD 测试的真实痛点不是"写不出用例"，而是这三个：
 # 1. 离线跑通（不需要 key、不需要网络）
 python run.py serve --port 8000        # 打开 http://127.0.0.1:8000
 python run.py run --prd data/prd/coupon-center-prd.md --auto
-python run.py eval --prd coupon-center-prd --golden data/golden/coupon-golden.json
+python run.py eval --prd coupon-center-prd --golden data/golden/coupon-golden.json --sweep
 
-# 2. 接真实模型
+# 2. 接真实模型（含 LLM judge 版 Fidelity）
 cp .env.example .env                   # 填入 LLM_API_KEY
 #   ATP_LLM_MODE=deepseek
-python run.py eval --prd coupon-center-prd --golden data/golden/coupon-golden.json
+python run.py eval --prd coupon-center-prd --golden data/golden/coupon-golden.json --sweep --judge llm
 
-# 3. 测试
-python -m pytest                       # 50 passed
+# 3. 测试与前端校验
+python -m pytest                       # 56 passed
+node scripts/check_web.js              # 模板编译校验（防白屏）
 ```
 
 前端依赖（Vue 3 + Element Plus）已本地化到 `web/vendor/`，断网也能演示。
+`scripts/check_web.js` 用 Vue 编译器在 Node 里编译模板，把"页面白屏但 HTTP 200"这类问题变成一条可执行检查。
 
 ---
 
@@ -144,12 +146,13 @@ atp/
   coverage/rules.py    确定性质量规则（覆盖/查重/可追溯/空话）
   pipeline/orchestrator.py 状态机 + HITL 闸门 + 人工改动 diff
   export/xlsx.py       Excel 导出（含闸门拦截）
-  eval/                指标、三模式执行器、报告渲染
+  eval/                指标（含阈值敏感性）、LLM judge、三模式执行器、报告渲染
 app/api.py             FastAPI（提测/运行/确认/裁决/导出）
 web/index.html         单文件 Vue3 控制台（依赖本地化）
+scripts/check_web.js   前端模板编译校验（Node + Vue compiler）
 data/prd/              PRD（优惠券中心 v1.4，2478 字，10 处隐性规则）
-data/golden/           人工标注基准集（42 条，20 条隐性）
-tests/                 50 个测试
+data/golden/           基准集（42 条，20 条隐性；AI 起草，待人工复核）
+tests/                 56 个测试
 reports/               评测报告
 docs/                  架构 / 实验计划 / 面试问答 / 简历叙事
 ```
@@ -159,12 +162,15 @@ docs/                  架构 / 实验计划 / 面试问答 / 简历叙事
 ## 八、已知限制
 
 1. **单系统单文档**：只验了"优惠券中心"一份 PRD，跨行业泛化未验证。
-2. **Fidelity 目前是启发式代理**：只判断关键数字是否被带入，不是真正的语义判断；
-   接 LLM judge 后应改为 1–5 分制并做一致性抽检。
-3. **匹配阈值 0.55 是拍的**：没有做阈值敏感性分析（应该做，属于下一步）。
-4. **人工确认在评测里是"录制回放"**：`rag_hitl` 模式用的是落盘的人工修改版测试地图，
+2. **基准集是 AI 起草的，还不是"人工标注"**：42 条由模型按 PRD 生成，必须逐条人工复核/改写后
+   才能这么叫。未经复核就写进简历，是最容易被戳穿的一点。
+3. **Fidelity 双路径**：默认启发式代理（只看关键数字是否带入）；`--judge llm` 走 1–5 分语义评判，
+   但 **judge 本身还没做过与人工评分的致率抽检**（`agreement_with_human()` 已实现，缺人工样本）。
+4. **阈值敏感性已可跑但未解读**：`--sweep` 会输出 0.40–0.80 的曲线；当前基线在 0.80 处才断崖，
+   说明基线匹配本来就脆，真实模型下的曲线才有解释价值。
+5. **人工确认在评测里是"录制回放"**：`rag_hitl` 模式用的是落盘的人工修改版测试地图，
    保证可复现，但不是本次实时人审——报告里必须写明。
-5. **无并发/性能验证**：流水线是同步的，100 个 PRD 批量跑会慢。
+6. **无并发/性能验证**：流水线是同步的，100 个 PRD 批量跑会慢。
 
 ---
 
@@ -173,5 +179,5 @@ docs/                  架构 / 实验计划 / 面试问答 / 简历叙事
 | 周 | 目标 | 产出 |
 |---|---|---|
 | W1 | 接真实模型跑通，替换 README 数字 | 真实三模式报告 + 首次失败分析 |
-| W2 | 阈值敏感性 + LLM judge + 人工逐条裁决 | Fidelity 改成 1–5 分、采纳率有数 |
+| W2 | 基准集人工复核 + LLM judge 致率抽检 + 逐条裁决 | 基准集可称"人工标注"、Fidelity 可信、采纳率有数 |
 | W3 | 包装：README 数字、3 分钟演示、简历 bullet、面试 FAQ | 投递材料 |
