@@ -232,6 +232,85 @@ def cmd_batch(args) -> int:
     return 0 if result.failed == 0 else 1
 
 
+def cmd_review_apply(args) -> int:
+    from atp.eval.golden_lint import lint
+    from atp.eval.review import apply_verdicts, load_doc, parse_verdicts, render_template, save_doc
+    from atp.parsers.prd import parse_file
+
+    settings = _settings()
+    golden = Path(args.golden)
+    if not golden.is_absolute() and not golden.exists():
+        golden = settings.golden_dir / golden.name
+    if not golden.exists():
+        print(f"[error] 找不到基准集：{golden}", file=sys.stderr)
+        return 2
+    doc = load_doc(golden)
+
+    if args.template:
+        out = Path(args.verdicts)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(render_template(doc), encoding="utf-8")
+        print(f"[template] 复核录入表已生成：{out}")
+        print("  用编辑器打开，每行补上 `通过` / `改 字段=值` / `删 理由`，然后重跑本命令（不带 --template）。")
+        return 0
+
+    verdicts_path = Path(args.verdicts)
+    if not verdicts_path.exists():
+        print(f"[error] 找不到复核文件：{verdicts_path}（先加 --template 生成）", file=sys.stderr)
+        return 2
+    verdicts, parse_errors = parse_verdicts(verdicts_path.read_text(encoding="utf-8"))
+    if parse_errors:
+        print("[error] 录入格式有问题：", file=sys.stderr)
+        for e in parse_errors[:10]:
+            print("  x " + e, file=sys.stderr)
+        return 2
+
+    annotator = args.annotator.strip() or "未署名"
+    rows, report = apply_verdicts(
+        doc["test_points"], verdicts, annotator=annotator, version=args.version, allow_partial=args.partial
+    )
+    print(f"[review] {report.summary()}")
+    print(f"  通过: {report.passed[:8]}{'…' if len(report.passed) > 8 else ''}")
+    print(f"  修改: {report.edited or '-'}")
+    print(f"  删除: {report.deleted or '-'}")
+    if report.errors:
+        print("[error] 应用失败（未写入任何文件）：", file=sys.stderr)
+        for e in report.errors[:10]:
+            print("  x " + e, file=sys.stderr)
+        return 1
+
+    # 先在内存副本上跑质检，0 error 才允许落盘
+    prd_path = Path(args.prd)
+    if not prd_path.exists():
+        for suffix in (".md", ".docx", ".txt"):
+            cand = settings.prd_dir / f"{args.prd}{suffix}"
+            if cand.exists():
+                prd_path = cand
+                break
+    if not prd_path.exists():
+        print(f"[error] 找不到 PRD：{args.prd}", file=sys.stderr)
+        return 2
+    prd = parse_file(prd_path, prd_id=prd_path.stem)
+    lint_report = lint(prd, rows)
+    print(f"[lint] {len(rows)} 条 → error {len(lint_report.errors)} / warn {len(lint_report.warns)}")
+    if report.deleted and any(w.code == "schema.id_sequence" for w in lint_report.warns):
+        print("  注意：有删除，编号不连续属正常（warn 不阻断评测）。")
+    for issue in lint_report.errors[:10]:
+        print(f"  x [{issue.code}] {issue.gid}: {issue.message}")
+    if not lint_report.ok:
+        print("[error] 质检未通过，拒绝写入。请修正上面的 error 后重试。", file=sys.stderr)
+        return 1
+
+    if args.dry_run:
+        print("[dry-run] 校验通过，但未写入（去掉 --dry-run 才落盘）")
+        return 0
+
+    save_doc(golden, doc, rows, annotator=annotator, version=args.version)
+    print(f"[done] 已写入 {golden}（annotator={annotator}, version={args.version}）")
+    print("  下一步：python run.py eval --prd coupon-center-prd --golden data/golden/coupon-golden.json")
+    return 0
+
+
 def cmd_list(args) -> int:
     settings = _settings()
     orc = Orchestrator(settings, RunStore(settings))
@@ -311,6 +390,17 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--mode", default="rag", choices=["bare", "rag", "rag_hitl"])
     p.add_argument("--workers", type=int, default=3)
     p.set_defaults(func=cmd_batch)
+
+    p = sub.add_parser("review-apply", help="把人工复核结论应用到基准集（自动质检后才落盘）")
+    p.add_argument("--golden", required=True)
+    p.add_argument("--verdicts", default="reports/golden-review.txt", help="复核录入文件")
+    p.add_argument("--prd", default="coupon-center-prd")
+    p.add_argument("--annotator", default="", help="你的名字（会写进 JSON 的 annotator 字段）")
+    p.add_argument("--version", default="v1.0")
+    p.add_argument("--template", action="store_true", help="生成空白录入表")
+    p.add_argument("--partial", action="store_true", help="允许只复核一部分")
+    p.add_argument("--dry-run", action="store_true", help="只校验不写入")
+    p.set_defaults(func=cmd_review_apply)
 
     p = sub.add_parser("export", help="导出 Excel")
     p.add_argument("--run", required=True)

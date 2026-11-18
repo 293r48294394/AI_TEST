@@ -17,7 +17,7 @@
 | 基准集质检（14 条规则） | 完成 | `python run.py lint-golden ...` |
 | 跨文档泛化（2 份 PRD） | 完成 | `pytest tests/test_cross_domain.py` |
 | 批量并发 + 成本核算 | 完成 | `python run.py batch ...` / `cost --run` |
-| 测试 | **81 passed** | `python -m pytest` |
+| 测试 | **92 passed** | `python -m pytest` |
 | 一键验证 | 6 步全绿 | `python scripts/verify.py` |
 
 **未完成的只有两件，都需要你本人参与**：
@@ -30,9 +30,11 @@
 ```bash
 cd ai-testcase-platform
 
-# 1) 复核基准集（打开表单，逐条写 通过/改/删）
-#    reports/golden-review-sheet.md  ← 每条旁边已放好 PRD 原文
-python run.py lint-golden --prd coupon-center-prd --golden data/golden/coupon-golden.json --sheet reports/golden-review-sheet.md
+# 1) 复核基准集（判定标准与例子见 docs/review-guide.md）
+python run.py review-apply --golden data/golden/coupon-golden.json --verdicts reports/golden-review.txt --template
+#    编辑 reports/golden-review.txt，每行补 通过 / 改 / 删
+python run.py review-apply --golden data/golden/coupon-golden.json --verdicts reports/golden-review.txt --annotator "你的名字" --dry-run
+python run.py review-apply --golden data/golden/coupon-golden.json --verdicts reports/golden-review.txt --annotator "你的名字"
 
 # 2) 跑真实模型（先把 LLM_API_KEY 填进 .env，ATP_LLM_MODE=deepseek）
 python run.py eval --prd coupon-center-prd --golden data/golden/coupon-golden.json --sweep --judge llm

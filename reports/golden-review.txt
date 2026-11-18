@@ -1,0 +1,47 @@
+# 基准集复核录入表
+# 每行格式：G-XXX 通过   |   G-XXX 改 标题=...; 期望=...; 分类=boundary   |   G-XXX 删 理由
+# 判定依据见 docs/review-guide.md：出处真实 / 可判定 / 可观测 / 不重复 / 分类正确
+# 全部写完后执行：python run.py review-apply --golden data/golden/coupon-golden.json --verdicts <本文件> --annotator 你的名字
+
+G-001   # [normal] 创建满100减20、全场、公开领取券模板成功入库
+G-002   # [normal] 创建8.5折、指定类目、定向发放券模板成功
+G-003   # [normal] 创建立减5元券时门槛被固定为0.00
+G-004   # [normal] 领取公开券成功时库存由100变为99并生成未使用券
+G-005   # [normal] 输入12位兑换码兑换成功后码状态变为已使用
+G-006   # [normal] 满100减20券对120元订单试算抵扣20元
+G-007   # [normal] 满100减20商品券与8元运费券叠加时先算商品券再算运费券
+G-008   # [normal] 订单支付成功后券状态由未使用变为已使用
+G-009   # [normal] 30分钟未支付自动关单后券恢复为未使用
+G-010   # [normal] 券到期后5分钟内被置为已过期并退出可用列表
+G-011   # [normal] 平台运营创建并发布满200减30全场平台券成功
+G-012   # [normal] 领取成功埋点携带库存前后值且差值为1
+G-013   # [exception] 库存为0时领取返回COUPON_SOLD_OUT
+G-014   # [exception] 活动开始前1秒领取返回COUPON_NOT_STARTED
+G-015   # [exception] 同时勾选8.5折券与满100减20券提交返回COUPON_CONFLICT
+G-016   # [exception] 同一券同一订单重复核销返回COUPON_ALREADY_VERIFIED
+G-017   # [exception] 整单退款后已核销券不返还且状态保持已使用
+G-018   # [exception] 支付超时关单回调重复投递时库存只回滚一次
+G-019   # [exception] 用户主动取消订单只退券不回滚库存
+G-020   # [exception] 使用已过期券提交订单返回COUPON_EXPIRED
+G-021   # [exception] 商家调用平台券创建接口返回403 ROLE_FORBIDDEN
+G-022   # [exception] 折扣率0.70低于下限0.80时创建失败
+G-023   # [exception] 核销埋点超过5秒未上报被对账标记并告警
+G-024   # [boundary] 满100减20券对99.99元订单不可用
+G-025   # [boundary] 订单金额恰好100.00元时满100减20券可用
+G-026   # [boundary] 订单金额100.01元时满100减20券可用且实付80.01
+G-027   # [boundary] 10.01元订单使用8.5折券应付8.51元
+G-028   # [boundary] 累计已领3张的用户第4次领取同一券模板被拦截
+G-029   # [boundary] 持有3张含1张客服补偿券的用户可领取第4张
+G-030   # [boundary] 活动开始前1秒与开始当秒的领取结果相反
+G-031   # [boundary] 有效期23:59:59当秒可用、次日00:00:00失效
+G-032   # [boundary] 实付100元、优惠20元订单部分退款33.33元返还6.67元
+G-033   # [boundary] 支付超时到30:00触发关单并释放库存
+G-034   # [boundary] 一单选择2张商品券加1张运费券被拒
+G-035   # [security] 同一兑换码第501次全局兑换返回CODE_EXHAUSTED
+G-036   # [security] 商家创建预算超过保证金20%的店铺券被拒
+G-037   # [security] 篡改userId领取他人定向券返回403
+G-038   # [security] 使用旧nonce重放核销请求返回REPLAY_REJECTED
+G-039   # [compat] UTC-5时区用户端显示10:59:59而判定按服务端时区
+G-040   # [compat] 小程序、H5、APP三端同一订单试算金额一致
+G-041   # [performance] 5000QPS抢1000张库存不超卖且P99不超过200ms
+G-042   # [performance] 1万笔核销在5分钟内完成且失败率低于0.01%
