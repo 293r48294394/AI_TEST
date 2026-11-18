@@ -20,10 +20,12 @@
 | 测试 | `python -m pytest` 全绿（当前 105 个） | `python -m pytest` |
 | 一键验证 | 6 步全绿 | `python scripts/verify.py` |
 
-**未完成的只剩一件**：没有真实模型数字 → README 里的表是离线基线，不代表模型能力。
+**未完成的只剩一件**：采纳率（需要你在控制台逐条裁决 ≥30 条用例）。
 
 基准集已于 2026-11-18 人工复核完成（屈永康：39 通过 / 3 修正，机器质检 0 error），
-证据在 `docs/examples/golden-review-applied.diff`，不再需要重复复核。
+证据在 `docs/examples/golden-review-applied.diff`。
+真实模型评测也已跑完（deepseek-chat，2026-11-18）：三模式召回 30.9%/33.3%/35.7%，
+隐性规则 20%/25%/35%，Fidelity 15.4%/28.6%/13.3%，数字已写入 README。
 
 ## 二、你回来后的四条命令
 

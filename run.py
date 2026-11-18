@@ -51,7 +51,11 @@ def cmd_run(args) -> int:
     orc = Orchestrator(settings, RunStore(settings))
     prd = _resolve_prd(orc, settings, args.prd)
     state = orc.start(prd, mode=args.mode)
-    print(f"[run] {state.run_id} status={state.status} stage={state.stage} features={len(state.testmap_ai.features)}")
+    print(f"[run] {state.run_id} status={state.status} stage={state.stage} features={len(state.testmap_ai.features) if state.testmap_ai else 0}")
+    if state.status == "failed":
+        print(f"[failed] {state.errors[-1] if state.errors else '未知错误'}", file=sys.stderr)
+        print(f"  运行产物仍保留：data/runs/{state.run_id}/（events.jsonl 有完整堆栈）", file=sys.stderr)
+        return 1
     for i, f in enumerate(state.testmap_ai.features, start=1):
         print(f"  {f.id} {f.name}  rules={len(f.rules)}  refs={[s.chunk_id for s in f.sources]}")
     if state.status == "awaiting_human":

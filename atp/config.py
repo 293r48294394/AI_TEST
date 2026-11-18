@@ -37,7 +37,7 @@ class Settings:
     temperature: float = 0.2
     timeout_s: float = 120.0
     max_retries: int = 3
-    max_repair: int = 2  # JSON 校验失败后的重试轮数
+    max_repair: int = 3  # JSON 校验失败后的重试轮数（真实模型建议 3）
 
     # ---- 流水线 ----
     require_human_review: bool = True
@@ -67,7 +67,7 @@ class Settings:
         data_dir = Path(os.environ.get("ATP_DATA_DIR", str(DEFAULT_DATA_DIR)))
         return cls(
             llm_mode=os.environ.get("ATP_LLM_MODE", "mock").lower(),
-            base_url=os.environ.get("CHECKME_LLM_BASE_URL", os.environ.get("LLM_BASE_URL", "https://api.deepseek.com")),
+            base_url=os.environ.get("LLM_BASE_URL", "https://api.deepseek.com"),
             api_key=os.environ.get("LLM_API_KEY", ""),
             model=os.environ.get("LLM_MODEL", "deepseek-chat"),
             temperature=float(os.environ.get("ATP_TEMPERATURE", "0.2")),

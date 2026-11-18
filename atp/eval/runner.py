@@ -130,6 +130,33 @@ def run_one(
     out.run_id = state.run_id
     out.status = state.status
     out.duration_ms = int((time.perf_counter() - started) * 1000)
+
+    # 失败运行也要把调用/成本算进去，否则报告会显示"0 次调用"，看起来像没跑
+    calls = orc.store.llm_calls(state.run_id)
+    out.llm = {
+        "calls": len(calls),
+        "failed": sum(1 for c in calls if not c.get("ok")),
+        "latency_ms": sum(int(c.get("latency_ms") or 0) for c in calls),
+        "prompt_chars": sum(int(c.get("prompt_chars") or 0) for c in calls),
+        "response_chars": sum(int(c.get("response_chars") or 0) for c in calls),
+    }
+
+    if state.status != "completed":
+        out.error = (state.errors[-1] if state.errors else "运行未完成")[:300]
+        out.ok = False
+        points = state.testpoints.test_points if state.testpoints else []
+        cases = state.cases.cases if state.cases else []
+        out.n_points, out.n_cases = len(points), len(cases)
+        out.score = state.review.score if state.review else None
+        out.gate = state.review.gate if state.review else ""
+        # 有产物就照常算指标，没有就留空
+        if points:
+            out.match = M.match_points(points, golden)
+            out.fidelity = M.fidelity_heuristic(points, golden, out.match.pairs)
+        out.adoption = M.adoption_stats(state)
+        out.fmt = M.format_stats(state)
+        return out
+
     points = state.testpoints.test_points if state.testpoints else []
     cases = state.cases.cases if state.cases else []
     out.n_points, out.n_cases = len(points), len(cases)

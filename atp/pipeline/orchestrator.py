@@ -119,8 +119,9 @@ class Orchestrator:
         try:
             self._stage_s1(state, client, prd, cfg)
         except Exception as exc:
+            # 阶段失败不抛异常：把失败写进状态并返回，调用方才拿得到 run_id 与审计日志
             self._fail(state, "s1_testmap", exc)
-            raise
+            return state
         self.store.save(state)
 
         if cfg.require_human:
@@ -201,7 +202,7 @@ class Orchestrator:
             self._stage_s4(state, client)
         except Exception as exc:
             self._fail(state, state.stage, exc)
-            raise
+            return  # 失败也返回，不抛：状态里已记录原因与已产生的产物
         state.stage = "done"
         state.status = "completed"
         state.touch()

@@ -36,7 +36,9 @@ SYSTEM = """你是一名有 8 年经验的资深测试分析师，擅长从 PRD 
 2. 你必须主动寻找并抽取「隐性规则」：它们通常藏在表格脚注（①②③）、括号补充、修订记录、
    埋点说明、待定问题的答复里，而不是正文主句。隐性规则要在 rules 里原样保留其约束条件。
 3. rules 要写成可判定的断言（含数值、状态、时限、角色），不要写"要保证正确"这类空话。
-4. 功能拆分粒度：按用户可独立操作的功能划分，6~10 个为宜，不要按页面拆，也不要拆到字段级。
+4. 功能拆分粒度：按用户可独立操作的功能划分，6~8 个为宜，**最多 10 个**；
+   超过 10 个必须合并同类项（例如把"创建/编辑/下架"合并为"券模板管理"），
+   因为输出过长会导致 JSON 被截断。
 5. 只输出 JSON，不要任何解释文字或 Markdown 代码围栏。"""
 
 
@@ -92,7 +94,9 @@ sources[].chunk_id 只能取上面出现过的块编号。"""
 
 def run(client: LLMClient, settings: Settings, prd, *, use_rag: bool = True, prd_id: str | None = None) -> SkillResult:
     prd_id = prd_id or prd.prd_id
-    hits = retrieve(prd, top_k=settings.retrieval_top_k * 2) if use_rag else []
+    # 检索面过宽会让模型拆出过多功能、输出被截断；10 块足够覆盖规则/脚注/待定问题
+    top_k = min(10, settings.retrieval_top_k * 2)
+    hits = retrieve(prd, top_k=top_k) if use_rag else []
     user = build_user_prompt(prd, hits, use_rag, prd_id)
 
     # 无检索模式下，上下文就是全文（截断），把它作为 payload 传给离线基线，
@@ -122,7 +126,12 @@ def _min_features(tm: TestMap) -> list[str]:
     issues = []
     if len(tm.features) < 2:
         issues.append(f"功能模块至少需要 2 个，当前 {len(tm.features)} 个")
+    if len(tm.features) > 12:
+        issues.append(f"功能模块过多（{len(tm.features)} 个），请合并到 12 个以内，避免输出被截断")
     empty = [f.id for f in tm.features if not f.rules]
     if empty and len(tm.features) <= 3:
         issues.append(f"以下功能没有任何 rules，请从原文补充业务规则：{empty}")
+    bloated = [f.id for f in tm.features if len(f.rules) > 8]
+    if bloated:
+        issues.append(f"以下功能的 rules 超过 8 条，请合并同类项：{bloated}")
     return issues

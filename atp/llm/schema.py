@@ -72,7 +72,7 @@ def call_json(
     validator: Callable[[T], list[str]] | None = None,
     max_repair: int = 2,
     extra_payload: dict | None = None,
-    max_tokens: int = 4096,
+    max_tokens: int = 8192,
 ) -> RepairOutcome:
     conv = Conversation(system)
     messages = conv.start(user)
@@ -82,6 +82,17 @@ def call_json(
     for attempt in range(1, max_repair + 2):
         result = client.chat(messages, task=task, json_mode=True, max_tokens=max_tokens, payload=extra_payload)
         raw = result.text
+        if getattr(result, "truncated", False):
+            # 被 max_tokens 截断：原样重试只会再截一次，必须要求模型压缩输出
+            problems.append(f"输出被截断（finish_reason=length，{len(raw)} 字符）")
+            messages = conv.add_repair(
+                raw,
+                "你上一次的输出因为过长被截断，JSON 不完整。请压缩后重新输出：\n"
+                "- 功能模块最多 8 个；每个功能的 rules 最多 4 条，每条不超过 40 字\n"
+                "- summary/rationale 不超过 30 字；不要输出无关的引用片段\n"
+                "只输出完整 JSON。",
+            )
+            continue
         try:
             data = json.loads(extract_json(raw))
             obj = model_cls.model_validate(data)

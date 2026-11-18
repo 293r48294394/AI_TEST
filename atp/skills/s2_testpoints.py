@@ -101,8 +101,13 @@ def _feature_ref(tm: TestMap) -> callable:
     ids = tm.feature_ids()
 
     def _validate(obj: TestPointSet) -> list[str]:
+        issues = []
         bad = sorted({p.feature_id for p in obj.test_points if p.feature_id not in ids})
-        return [f"feature_id 不存在于测试地图：{bad}，只能是 {sorted(ids)}"] if bad else []
+        if bad:
+            issues.append(f"feature_id 不存在于测试地图：{bad}，只能是 {sorted(ids)}")
+        if len(obj.test_points) > 60:
+            issues.append(f"测试点过多（{len(obj.test_points)} 条），请合并到 60 条以内，避免输出被截断")
+        return issues
 
     return _validate
 

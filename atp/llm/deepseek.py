@@ -57,11 +57,18 @@ class DeepSeekClient(LLMClient):
             body["response_format"] = {"type": "json_object"}
 
         prompt_chars = sum(len(m.content) for m in messages)
+        if json_mode:
+            # DeepSeek 的 response_format=json_object 要求提示词里出现 "json"，
+            # 否则直接 400。这不是我们的提示词问题（各 Skill 都写了"只输出 JSON"），
+            # 但客户端不该依赖调用方记得写这五个字符 —— 缺了就补一句。
+            if not any("json" in m.content.lower() for m in messages):
+                messages = list(messages) + [Message("user", "请以 JSON 格式输出，不要任何解释文字。")]
+                prompt_chars = sum(len(m.content) for m in messages)
         last_err = ""
         for attempt in range(1, self.opt.max_retries + 1):
             started = time.perf_counter()
             try:
-                raw = self._post(body)
+                raw, finish = self._post(body)
                 latency = int((time.perf_counter() - started) * 1000)
                 self._emit(
                     {
@@ -73,9 +80,12 @@ class DeepSeekClient(LLMClient):
                         "prompt_chars": prompt_chars,
                         "response_chars": len(raw),
                         "est_prompt_tokens": est_tokens("".join(m.content for m in messages)),
+                        "finish_reason": finish,
                     }
                 )
-                return CallResult(raw, attempt=attempt, latency_ms=latency, prompt_chars=prompt_chars)
+                return CallResult(
+                    raw, attempt=attempt, latency_ms=latency, prompt_chars=prompt_chars, truncated=(finish == "length")
+                )
             except _Retryable as exc:
                 latency = int((time.perf_counter() - started) * 1000)
                 last_err = str(exc)
@@ -111,7 +121,7 @@ class DeepSeekClient(LLMClient):
         raise LLMError(f"LLM 调用失败（已重试 {self.opt.max_retries} 次）：{last_err}")
 
     # ----------------------------------------------------------------- private
-    def _post(self, body: dict) -> str:
+    def _post(self, body: dict) -> tuple[str, str]:
         req = urllib.request.Request(
             f"{self.base_url}/chat/completions",
             data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
@@ -138,11 +148,12 @@ class DeepSeekClient(LLMClient):
         try:
             choice = data["choices"][0]
             content = (choice.get("message") or {}).get("content") or ""
+            finish = str(choice.get("finish_reason") or "")
         except (KeyError, IndexError, TypeError) as exc:
             raise _Retryable(f"响应结构异常: {str(data)[:200]}") from exc
         if not content.strip():
             raise _Retryable("模型返回空内容")
-        return content
+        return content, finish
 
     def _emit(self, row: dict) -> None:
         if self.on_call:

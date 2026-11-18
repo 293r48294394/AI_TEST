@@ -28,11 +28,13 @@
 2. 构建 **42 条基准集**（其中 20 条来自 PRD 表格脚注/修订记录等隐性规则），由测试工程师逐条复核
    （39 条通过、3 条修正，修的是 AI 编造的 PRD 未定义 UI 断言与 1 处分类错误），
    并用确定性规则校验其质量（来源可定位/标题可判定/期望可观测/场景去重，当前 0 error），
-   对比裸提示词 / RAG / RAG+人工确认三种模式：场景匹配率从 `{{x}}%` 提升至 `{{y}}%`，
-   **隐性规则召回率从 `{{a}}%` 提升至 `{{b}}%`**，定位模型在 `{{具体类型}}` 场景上的稳定失效模式。
+   对比裸提示词 / RAG / RAG+人工确认三种模式（deepseek-chat 实测）：场景匹配率 30.9% → 33.3% → 35.7%，
+   **隐性规则召回率 20% → 25% → 35%**，并定位出 5 类稳定失效模式（数值精度边界、累计配额口径、
+   埋点与对账、退款返还、跨端一致）——这 5 类正是三种模式共漏的 24/42 条场景。
 
 3. 针对 LLM 输出不可解析与幻觉问题，设计 JSON Schema 校验 + 错误回喂重试 + 证据引用完整性校验
-   （引用 id 必须来自本次检索结果），格式一次通过率 `{{p}}%`，重试 `{{r}}` 次后收敛；
+   （引用 id 必须来自本次检索结果），实测首次通过率 75.0%–87.5%、1–2 轮重试内收敛；
+   并解决真实模型输出被 max_tokens 截断导致整条流水线失败的问题（截断检测 + 压缩重试）；
    评审闸门为 `revise` 时导出接口直接拒绝，避免低质量用例进入用例库。
 
 4. 为平台自身编写 **102 个 pytest**（解析/检索/契约修复/覆盖规则/闸门/导出/指标，全离线可跑），
@@ -50,15 +52,18 @@ pytest、评测基准集设计
    explicit state machine with a human-in-the-loop gate before case generation; human edits are
    quantified as `+{{n}}/-{{n}}/~{{n}}`.
 
-2. Built a 42-item golden set (20 items derived from buried rules in tables,
-   footnotes and revision logs), validated by deterministic checks for source traceability,
-   decidability, observability and scenario de-duplication; compared bare-prompt / RAG /
-   RAG+human-in-the-loop: scenario match rate `{{x}}% → {{y}}%`, implicit-rule recall
-   `{{a}}% → {{b}}%`, isolating consistent failure modes on `{{type}}` scenarios.
+2. Built a 42-item golden set (20 items derived from buried rules in tables, footnotes and revision
+   logs), human-reviewed (39 accepted / 3 corrected) and validated by deterministic checks for source
+   traceability, decidability, observability and de-duplication; compared bare-prompt / RAG /
+   RAG+human-in-the-loop on deepseek-chat: scenario match 30.9% → 33.3% → 35.7%, implicit-rule recall
+   20% → 25% → 35%, and isolated 5 recurring failure modes (numeric precision boundaries, cumulative
+   quota rules, telemetry/accounting, refund handling, cross-client consistency) covering the 24/42
+   scenarios missed by all three modes.
 
-3. Enforced schema-constrained generation (pydantic + error-feedback retry + citation-integrity
-   checks against retrieved chunks); first-pass format compliance `{{p}}%`, converging in `{{r}}`
-   repair rounds; export is blocked when the review gate returns `revise`.
+3. Enforced schema-constrained generation (pydantic + error-feedback retry + citation-integrity checks
+   against retrieved chunks); first-pass success 75.0%–87.5%, converging within 1–2 repair rounds;
+   diagnosed and fixed real-model JSON truncation (finish_reason=length) with compress-and-retry;
+   export is blocked when the review gate returns `revise`.
 
 4. Wrote 102 offline pytest cases covering parsing, retrieval, contract repair, coverage rules,
    gating and metrics; tracked Match Rate / Fidelity / format compliance / adoption (`{{q}}%`).

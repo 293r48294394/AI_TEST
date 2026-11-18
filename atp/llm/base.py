@@ -27,6 +27,9 @@ class CallResult:
     latency_ms: int = 0
     prompt_chars: int = 0
     error: str = ""
+    # 模型因 max_tokens 截断（finish_reason=length）：此时 text 不是完整 JSON，
+    # 需要让上层"压缩重试"而不是原样重试。
+    truncated: bool = False
 
 
 @dataclass

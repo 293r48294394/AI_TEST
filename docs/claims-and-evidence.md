@@ -36,10 +36,10 @@
 | 三模式对比评测器 | `atp/eval/runner.py` | `python run.py eval ...` | 强（机制） |
 | 42 条基准集（20 条隐性规则） | `data/golden/coupon-golden.json`、`docs/examples/golden-review-applied.diff` | `python run.py lint-golden ...` | 强（已人工复核：39 通过 / 3 修正；单一复核人，无 κ 一致性） |
 | 基准集机器质检 0 error | `atp/eval/golden_lint.py`、`tests/test_golden_lint.py` | 同左 | 强 |
-| Match Rate 2.4% | `reports/eval-coupon-center-prd-*.md` | `python run.py eval ...` | **弱**（仅离线基线） |
-| 隐性规则召回 0/20 | 同上 | 同上 | **弱**（仅离线基线） |
+| Match Rate 30.9% → 33.3% → 35.7%（三模式） | `reports/eval-coupon-center-prd-*.md`（2026-11-18 真实模型） | `python run.py eval ...` | 强（真实模型、可复现；样本 42 条，无置信区间） |
+| 隐性规则召回 20% → 25% → 35%（4→5→7 / 20） | 同上 | 同上 | 强（同上，样本仅 20 条隐性规则） |
 | 阈值敏感性分析 | `sweep_threshold`、`tests/test_eval_judge.py` | `eval --sweep` | 中（曲线有了，解读待真实模型） |
-| Fidelity 双路径 | `atp/eval/judge.py`、启发式代理 | `eval --judge llm` | 中（judge 未做致率抽检） |
+| Fidelity 13–29%（三模式，LLM judge） | `atp/eval/judge.py`、报告 `fidelity_*` 字段 | `eval --judge llm` | 中（judge 未与人工评分做致率抽检，只能当"参考方向"） |
 | 采纳率 | `POST /adoption` + `adoption_stats` | 界面逐条裁决 | **弱**（无分母，未实测） |
 
 ## 三、成本与性能
