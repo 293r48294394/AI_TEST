@@ -60,15 +60,26 @@
 <script>
   /* 启动诊断：任何 JS 错误都直接显示在页面上（白屏时也能看到原因） */
   window.__bootErrors = [];
+  window.__bootDone = false;
+  // 已知良性告警：ResizeObserver 是浏览器在布局抖动时的规范噪音，Element Plus 表格常见
+  var __BENIGN = /ResizeObserver loop|Script error\.?$|Non-Error promise rejection/;
   function __showBootError(msg) {
+    if (__BENIGN.test(String(msg))) return;
+    if (window.__bootDone) return;  // 已成功挂载后不再打扰用户
     try {
       var el = document.getElementById('__boot_err');
       if (!el) {
         el = document.createElement('div');
         el.id = '__boot_err';
         el.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:2147483647;background:#fff3f3;color:#b00020;' +
-          'border-bottom:3px solid #b00020;font:13px/1.6 Consolas,monospace;padding:14px 18px;white-space:pre-wrap;' +
-          'max-height:70vh;overflow:auto';
+          'border-bottom:3px solid #b00020;font:13px/1.6 Consolas,monospace;padding:14px 44px 14px 18px;' +
+          'white-space:pre-wrap;max-height:70vh;overflow:auto';
+        var close = document.createElement('button');
+        close.textContent = '×';
+        close.style.cssText = 'position:absolute;right:10px;top:8px;border:0;background:transparent;' +
+          'color:#b00020;font-size:20px;cursor:pointer;line-height:1';
+        close.onclick = function () { el.remove(); };
+        el.appendChild(close);
         (document.body || document.documentElement).appendChild(el);
       }
       el.textContent += (el.textContent ? '\n' : '') + msg;
@@ -598,6 +609,9 @@ var app = createApp({
 try {
   app.use(ElementPlus);
   app.mount('#app');
+  window.__bootDone = true;
+  var __err = document.getElementById('__boot_err');
+  if (__err) __err.remove();
 } catch (err) {
   __showBootError('启动失败：' + (err && (err.stack || err.message)));
 }
