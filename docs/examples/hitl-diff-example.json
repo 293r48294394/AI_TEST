@@ -1,0 +1,19 @@
+{
+  "added": [
+    "F-99"
+  ],
+  "removed": [],
+  "edited": [
+    {
+      "id": "F-01",
+      "fields": [
+        "rules"
+      ],
+      "rules_added": [
+        "【人工补充】券预算达到 100% 时自动停发"
+      ],
+      "rules_removed": []
+    }
+  ],
+  "summary": "+1 / -0 / ~1"
+}

@@ -1,0 +1,35 @@
+{
+  "score": 81,
+  "gate": "pass",
+  "coverage": {
+    "normal": 15,
+    "exception": 6,
+    "boundary": 6,
+    "security": 1,
+    "compat": 1,
+    "performance": 1
+  },
+  "issues": [
+    {
+      "type": "duplicate",
+      "severity": "major",
+      "message": "用例 TC-003 与 TC-008 高度相似（0.87），疑似重复",
+      "ref": "TC-003"
+    },
+    {
+      "type": "duplicate",
+      "severity": "major",
+      "message": "用例 TC-017 与 TC-022 高度相似（0.90），疑似重复",
+      "ref": "TC-017"
+    },
+    {
+      "type": "format",
+      "severity": "minor",
+      "message": "以下用例 test_data 为空，可执行性不足：['TC-001', 'TC-002', 'TC-003', 'TC-004', 'TC-005', 'TC-006', 'TC-007', 'TC-008', 'TC-009', 'TC-010']",
+      "ref": "skill3"
+    }
+  ],
+  "suggestions": [
+    "部分用例的 test_data 为空，建议补齐具体输入数据以提升可执行性"
+  ]
+}

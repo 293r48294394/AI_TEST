@@ -31,6 +31,7 @@ def steps() -> list[tuple[str, list[str], bool]]:
     else:
         out.append(("前端模板编译", [], False))
     out += [
+        ("文档链接", [py, "scripts/check_docs.py"], True),
         ("基准集质检", [py, "run.py", "lint-golden", "--prd", PRD, "--golden", GOLDEN], True),
         ("端到端（bare 自动确认）", [py, "run.py", "run", "--prd", PRD, "--mode", "bare", "--auto"], True),
         ("三模式评测（含阈值敏感性）", [py, "run.py", "eval", "--prd", "coupon-center-prd", "--golden", GOLDEN, "--sweep"], True),

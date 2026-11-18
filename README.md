@@ -229,7 +229,8 @@ data/golden/           coupon-golden.json（42 条主基准，20 条隐性）
                        account-login-golden.json（20 条泛化探针，不当模型能力用）
 tests/                 81 个测试
 reports/               评测报告 + 基准集复核表单
-docs/                  架构 / 实验计划 / 面试问答 / 简历叙事
+docs/                  架构 / 实验计划 / 面试问答 / 简历叙事 / **声称-证据对照表**
+docs/examples/         真实运行的产物示例（人工改动 diff、评审报告）
 ```
 
 ---

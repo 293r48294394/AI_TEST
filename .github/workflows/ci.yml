@@ -28,6 +28,9 @@ jobs:
       - name: 前端模板编译校验
         run: node scripts/check_web.js
 
+      - name: 文档链接校验
+        run: python scripts/check_docs.py
+
       - name: 基准集质检（来源可定位/标题可判定/无重复）
         env:
           ATP_LLM_MODE: mock
