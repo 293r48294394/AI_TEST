@@ -1,0 +1,209 @@
+{
+  "prd_id": "account-login-v2.1",
+  "version": "v0-probe",
+  "annotator": "ai-draft",
+  "purpose": "跨文档泛化探针：验证流水线不依赖「优惠券」领域假设，不用于衡量模型能力",
+  "annotation_note": "20 条场景级测试点，覆盖六类；其中 8 条来自表格脚注/待定问题答复，用于检验隐性规则抽取是否跨域成立。",
+  "test_points": [
+    {
+      "id": "G-001",
+      "feature": "密码登录",
+      "category": "normal",
+      "title": "正确手机号与密码登录成功并返回 accessToken",
+      "expectation": "HTTP 200，返回 accessToken 与 expiresIn=604800，写一条登录成功日志",
+      "priority": "P0",
+      "source": "PRD 3.1 表 3-1",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-002",
+      "feature": "短信验证码登录",
+      "category": "normal",
+      "title": "输入 6 位正确验证码登录成功且验证码置为已使用",
+      "expectation": "HTTP 200，返回 accessToken，验证码记录状态字段变为 USED",
+      "priority": "P0",
+      "source": "PRD 3.2 条款 3.2.2",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-003",
+      "feature": "第三方授权登录",
+      "category": "normal",
+      "title": "微信授权首次登录自动建号并返回 1 条新会话",
+      "expectation": "HTTP 200，返回 isNewUser=true 与 accessToken，用户表新增 1 条记录",
+      "priority": "P1",
+      "source": "PRD 3.3 条款 3.3.1",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-004",
+      "feature": "会话与登出",
+      "category": "normal",
+      "title": "主动登出后原 token 调用接口返回 401",
+      "expectation": "HTTP 401，错误码 SESSION_INVALID，会话表状态变为 LOGGED_OUT",
+      "priority": "P1",
+      "source": "PRD 3.4 条款 3.4.1",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-005",
+      "feature": "会话与登出",
+      "category": "normal",
+      "title": "登录第 3 天访问接口后有效期滑动续至 7 天",
+      "expectation": "HTTP 200，响应头 X-Token-Expire 更新，会话表 expire_at 延长至当前+7 天",
+      "priority": "P2",
+      "source": "PRD 3.4 条款 3.4.2",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-006",
+      "feature": "登录风控",
+      "category": "exception",
+      "title": "连续第 6 次密码错误返回锁定 30 分钟",
+      "expectation": "HTTP 423，错误码 ACCOUNT_LOCKED，返回锁定截止时间=当前+30 分钟，写风控日志",
+      "priority": "P0",
+      "source": "PRD 4 表 4-1 脚注①",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-007",
+      "feature": "短信验证码登录",
+      "category": "exception",
+      "title": "同一验证码错误 5 次后作废，第 6 次输入正确仍被拒",
+      "expectation": "HTTP 400，错误码 CAPTCHA_EXPIRED，验证码记录状态为 INVALID",
+      "priority": "P1",
+      "source": "PRD 3.2 表 3-2 脚注①",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-008",
+      "feature": "短信验证码登录",
+      "category": "exception",
+      "title": "验证码超过 5 分钟后提交返回已过期",
+      "expectation": "HTTP 400，错误码 CAPTCHA_EXPIRED，响应体不含 accessToken",
+      "priority": "P0",
+      "source": "PRD 3.2 表 3-2",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-009",
+      "feature": "会话与登出",
+      "category": "exception",
+      "title": "会话过期后调用受保护接口返回 401",
+      "expectation": "HTTP 401，错误码 TOKEN_EXPIRED，响应体不含用户信息",
+      "priority": "P0",
+      "source": "PRD 3.4 条款 3.4.3",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-010",
+      "feature": "第三方授权登录",
+      "category": "exception",
+      "title": "第三方回调 state 不匹配时拒绝登录且不创建会话",
+      "expectation": "HTTP 400，错误码 OAUTH_STATE_INVALID，会话表记录数为 0",
+      "priority": "P1",
+      "source": "PRD 3.3 条款 3.3.2",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-011",
+      "feature": "密码登录",
+      "category": "boundary",
+      "title": "密码长度为 8 位下限时注册成功",
+      "expectation": "HTTP 200，注册成功，密码字段以 bcrypt 存储（cost≥10），不出现明文",
+      "priority": "P1",
+      "source": "PRD 3.1 表 3-1 脚注",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-012",
+      "feature": "密码登录",
+      "category": "boundary",
+      "title": "密码长度为 7 位时注册被拒",
+      "expectation": "HTTP 400，错误码 PASSWORD_TOO_WEAK，提示至少 8 位，用户表无新增记录",
+      "priority": "P1",
+      "source": "PRD 3.1 表 3-1",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-013",
+      "feature": "短信验证码登录",
+      "category": "boundary",
+      "title": "同一手机号当日第 11 条短信被限流",
+      "expectation": "HTTP 429，错误码 SMS_DAILY_LIMIT，当日发送计数仍为 10，日志记录手机号脱敏值",
+      "priority": "P1",
+      "source": "PRD 3.2 表 3-2 脚注③",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-014",
+      "feature": "短信验证码登录",
+      "category": "boundary",
+      "title": "验证码 60 秒内重复发送返回限流并带剩余秒数",
+      "expectation": "HTTP 429，错误码 SMS_TOO_FREQUENT，响应体 retryAfter 字段为剩余秒数",
+      "priority": "P1",
+      "source": "PRD 3.2 表 3-2 脚注②",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-015",
+      "feature": "会话与登出",
+      "category": "boundary",
+      "title": "会话恰好第 7 天整仍可访问接口",
+      "expectation": "HTTP 200，返回业务数据，会话表 expire_at 未过期，不触发续期",
+      "priority": "P2",
+      "source": "PRD 3.4 条款 3.4.2",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-016",
+      "feature": "权限",
+      "category": "security",
+      "title": "普通用户调用人工解锁接口返回 403",
+      "expectation": "HTTP 403，错误码 ROLE_FORBIDDEN，写审计日志，账号锁定状态不变",
+      "priority": "P0",
+      "source": "PRD 2 表 2-1 脚注",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-017",
+      "feature": "登录风控",
+      "category": "security",
+      "title": "账号不存在与密码错误返回同一文案且耗时差小于 50ms",
+      "expectation": "两种输入均返回 HTTP 401 与 AUTH_FAILED，文案完全一致，响应时间差 <50ms",
+      "priority": "P0",
+      "source": "PRD 4 表 4-1 脚注④",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-018",
+      "feature": "会话与登出",
+      "category": "security",
+      "title": "重置密码后 3 条旧会话全部失效并返回 401",
+      "expectation": "重置成功后原 token 调用接口均返回 HTTP 401，会话表该用户全部状态为 LOGGED_OUT",
+      "priority": "P0",
+      "source": "PRD 6 待定问题 Q2 答复",
+      "implicit_rule": true
+    },
+    {
+      "id": "G-019",
+      "feature": "会话与登出",
+      "category": "compat",
+      "title": "iOS 与 Android 同时在线 2 个会话互不踢出",
+      "expectation": "两端 token 均有效，会话表存在 2 条不同设备记录，任一端登出不影响另一端",
+      "priority": "P2",
+      "source": "PRD 3.4 条款 3.4.4",
+      "implicit_rule": false
+    },
+    {
+      "id": "G-020",
+      "feature": "非功能",
+      "category": "performance",
+      "title": "登录接口 500 QPS 下 P99 不超过 300ms 且错误率为 0",
+      "expectation": "压测 500 QPS 持续 5 分钟，P99 ≤ 300ms，错误率 0，无误锁定记录",
+      "priority": "P1",
+      "source": "PRD 5 非功能要求",
+      "implicit_rule": false
+    }
+  ]
+}

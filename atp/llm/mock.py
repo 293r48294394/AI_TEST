@@ -21,6 +21,13 @@ _NUM_RULE = re.compile(r"\d+(?:\.\d+)?\s*(?:张|次|元|天|小时|分钟|秒|%|
 _RULE_HINT = re.compile(r"(必须|不得|不可|不能|最多|至少|仅|只允许|上限|不得超过|需|应|禁止|支持)")
 _SECTION = re.compile(r"^(#{1,6})\s*(.+)$")
 _FOOTNOTE = re.compile(r"[①②③④⑤⑥⑦⑧⑨⑩]")
+# 与 Skill 2 的覆盖门槛保持一致（离线基线也要满足同一份契约）
+_REQUIRED_MIN = {"normal": 3, "exception": 3, "boundary": 3, "security": 1, "compat": 1, "performance": 1}
+# 目录类章节不是"功能模块"，基线不把它们当 feature
+_SKIP_HEADING = re.compile(
+    r"(背景|目标|文档信息|版本记录|修订记录|变更记录|目录|术语|名词|附录|待定问题|"
+    r"非功能|埋点|异常与边界|异常清单|角色与权限|功能需求|业务规则|验收|上线)"
+)
 
 
 class HeuristicClient(LLMClient):
@@ -150,36 +157,36 @@ class HeuristicClient(LLMClient):
             add("exception", f"{noun}在参数非法（缺失/类型错误/超长）时返回错误码且不落脏数据", "负向路径", "P1")
             for rule in rules[:2]:
                 add("normal", f"{noun}满足规则：{rule[:40]}", "逐条规则验证", "P1")
-        if points and not any(p["category"] == "security" for p in points):
-            points.append(
-                {
-                    "id": f"TP-{len(points) + 1:03d}",
-                    "feature_id": points[0]["feature_id"],
-                    "category": "security",
-                    "title": "越权访问：普通用户调用管理侧接口被拒绝",
-                    "rationale": "接口鉴权基线检查",
-                    "priority": "P0",
-                    "sources": points[0]["sources"],
-                }
-            )
-        # 规则基线也要满足六类覆盖门槛，否则它连"可被评估的基线"都算不上
-        for cat, title in (
-            ("compat", "在 Chrome/Android 主流版本上核心链路的展示与操作一致"),
-            ("performance", "领取峰值并发下 P99 响应时间不超过 200ms 且无超卖"),
-            ("security", "重复提交同一领取请求仅生效一次（幂等）"),
-        ):
-            if points and not any(p["category"] == cat for p in points):
+        # 规则基线也必须满足六类覆盖门槛，否则它连"可被评估的基线"都算不上。
+        # 这里按缺口补齐（而不是只补三类），因为文档长短不同会让某些类别天然缺失。
+        generic = {
+            "normal": ("核心链路在合法输入下成功执行并返回预期结果", "P0"),
+            "exception": ("参数非法（缺失/类型错误/超长）时返回错误码且不落脏数据", "P1"),
+            "boundary": ("输入为空或取极值时给出明确提示且不崩溃", "P1"),
+            "security": ("越权访问：普通用户调用管理侧接口被拒绝", "P0"),
+            "compat": ("多端/主流版本上核心链路的展示与操作一致", "P2"),
+            "performance": ("峰值并发下 P99 时延达标且无数据错乱", "P1"),
+        }
+        anchors = payload.get("features") or [{"id": "F-01", "name": "功能", "sources": []}]
+        cursor = 0
+        for cat, need in _REQUIRED_MIN.items():
+            have = sum(1 for p in points if p["category"] == cat)
+            while have < need:
+                anchor = anchors[cursor % len(anchors)]
+                cursor += 1
+                title, priority = generic[cat]
                 points.append(
                     {
                         "id": f"TP-{len(points) + 1:03d}",
-                        "feature_id": points[0]["feature_id"],
+                        "feature_id": anchor.get("id", "F-01"),
                         "category": cat,
-                        "title": title,
-                        "rationale": "通用质量属性基线",
-                        "priority": "P1",
-                        "sources": points[0]["sources"],
+                        "title": f"{anchor.get('name', '功能')}：{title}",
+                        "rationale": "通用质量属性基线（覆盖门槛补齐）",
+                        "priority": priority,
+                        "sources": anchor.get("sources", [])[:1],
                     }
                 )
+                have += 1
         return {"test_points": points}
 
     def _task_s3_testcases(self, payload: dict) -> dict:
@@ -228,12 +235,20 @@ class HeuristicClient(LLMClient):
     # ---------------------------------------------------------------- helpers
     @staticmethod
     def _feature_name(heading: str, text: str) -> str:
-        heading = re.sub(r"^[0-9.\s]+", "", heading).strip()
-        if not heading or len(heading) > 30:
+        """按"章节标题是否像一个功能模块"判断，而不是匹配业务关键词。
+
+        早期版本用关键词白名单（领取/创建/支付…），在换领域时直接失效——
+        账号域的"密码登录""会话与登出"一个都识别不出来。跨文档验证就是为了逼出这类过拟合。
+        """
+        heading = re.sub(r"^[0-9.\s]+", "", heading or "").strip()
+        if not heading or len(heading) > 24:
             return ""
-        if re.search(r"(功能|需求|领取|创建|使用|核销|退款|过期|库存|权限|优惠券|下单|支付)", heading):
-            return heading
-        return ""
+        if _SKIP_HEADING.search(heading):
+            return ""
+        # 纯标题（无正文）或带"表/图"字样的不算功能模块
+        if re.search(r"^(表|图)\s*\d", heading):
+            return ""
+        return heading
 
     @staticmethod
     def _summary(text: str) -> str:
