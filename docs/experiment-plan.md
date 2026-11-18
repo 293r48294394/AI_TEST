@@ -9,7 +9,7 @@
 - [x] 四 Skill + 状态机 + HITL 闸门 + JSON 契约校验
 - [x] 离线启发式基线（无 key 也能跑通全链路，进 CI）
 - [x] 42 条人工标注基准集（20 条隐性规则）— **待你逐条复核后才算"人工标注"**
-- [x] 三模式评测器 + Markdown 报告 + 56 个测试
+- [x] 三模式评测器 + Markdown 报告 + 70 个测试
 - [x] Fidelity 双路径（启发式代理 / `--judge llm` 的 1–5 分评判）
 - [x] 阈值敏感性分析（`--sweep`）
 - [x] 前端模板编译校验（`node scripts/check_web.js`）
@@ -34,6 +34,8 @@
 
 1. **基准集人工复核**（最优先，别人替不了）
    42 条逐条对 PRD 核对：标题是否可判定、`source` 是否真实存在、期望是否可观测。
+   用现成的表单：`python run.py lint-golden --prd coupon-center-prd --golden data/golden/coupon-golden.json --sheet reports/golden-review-sheet.md`
+   （每条基准点旁边已并排放好 PRD 原文，只需写 `通过`/`改`/`删`）。
    复核完把 `annotator` 从 `human`（草稿）改成你的名字 + 日期，这条简历才算真的。
 2. **人工逐条裁决**（必须人做，不能 AI 打分）
    在控制台「③ 用例」里逐条点「可用/需修改/不可用」，至少覆盖 30 条 → 采纳率才有数。

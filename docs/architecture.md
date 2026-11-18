@@ -104,7 +104,25 @@ gate  = pass 当且仅当 无 blocker 且 score ≥ 75
 | 换 Fidelity 判定 | `eval/judge.py`（1–5 分）或 `eval/metrics.fidelity_heuristic`（代理） | 报告里的 `fidelity_judge` 字段自动标注 |
 | 换匹配算法 | `eval/metrics.match_points` | 阈值敏感性 `sweep_threshold` 会一并变化 |
 
-## 7. 前端
+## 7. 基准集为什么需要质检
+
+基准集是这套评测的"标尺"。标尺本身有毛刺，所有指标都不可信，而且错误很难被发现——
+它不会报错，只会让召回率虚高或虚低。
+
+`eval/golden_lint.py` 用确定性规则查四类脏数据，每类都对应一种真实的失败模式：
+
+| 检查 | 对应失败模式 |
+|---|---|
+| `source.unresolved` | 凭印象写出处（表格/脚注根本不存在）→ 基准点无依据，召回虚高 |
+| `title.not_decidable` | 标题是"优惠券功能正常"→ 无法判定 pass/fail，匹配时靠字面碰运气 |
+| `expectation.not_observable` | 期望是"返回成功"→ 没有断言点，用例不可执行 |
+| `duplicate.scenario` | 同一场景两条 → 一条命中被算两次召回 |
+
+error 阻断（`lint-golden` 退出码 1，pytest 里也有断言），warn 留给人判断。
+另外 `render_review_sheet()` 会把 PRD 原文摘录并排放在每条基准点旁——
+没有原文对照，"人工复核"就会退化成"扫一眼标题点通过"。
+
+## 8. 前端
 
 单文件 `web/index.html`：Vue 3 + Element Plus（`web/vendor/` 本地化，断网可用）。
 页面职责只有四个：看中间产物、在闸门处改测试地图、逐条裁决、导出。

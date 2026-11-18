@@ -110,6 +110,63 @@ def cmd_eval(args) -> int:
     return 0
 
 
+def cmd_lint(args) -> int:
+    from atp.eval.golden_lint import lint_files, render_markdown, render_review_sheet
+
+    settings = _settings()
+    prd_path = Path(args.prd)
+    if not prd_path.exists():
+        for suffix in (".md", ".docx", ".txt"):
+            cand = settings.prd_dir / f"{args.prd}{suffix}"
+            if cand.exists():
+                prd_path = cand
+                break
+    golden = Path(args.golden)
+    if not golden.is_absolute() and not golden.exists():
+        golden = settings.golden_dir / golden.name
+    if not prd_path.exists() or not golden.exists():
+        print(f"[error] 文件不存在：prd={prd_path} golden={golden}", file=sys.stderr)
+        return 2
+    rep = lint_files(prd_path, golden)
+    print(render_markdown(rep))
+
+    if args.sheet:
+        from atp.eval.golden_lint import load_rows
+        from atp.parsers.prd import parse_file
+
+        sheet = Path(args.sheet)
+        prd = parse_file(prd_path, prd_id=prd_path.stem)
+        sheet.write_text(render_review_sheet(prd, load_rows(golden)), encoding="utf-8")
+        print(f"\n[sheet] 人工复核表单已生成：{sheet}")
+    return 0 if rep.ok else 1
+
+
+def cmd_doctor(args) -> int:
+    """环境自检：换机器/换虚拟机时先跑这个。"""
+    import importlib
+    import shutil as _shutil
+
+    settings = _settings()
+    print(f"Python      : {sys.version.split()[0]} ({sys.executable})")
+    print(f"工作目录    : {ROOT}")
+    for mod in ("fastapi", "uvicorn", "pydantic", "openpyxl", "pytest"):
+        try:
+            importlib.import_module(mod)
+            print(f"  OK   {mod}")
+        except Exception as exc:
+            print(f"  FAIL {mod}: {type(exc).__name__}")
+    print(f"Node        : {_shutil.which('node') or '未安装（前端校验会跳过）'}")
+    print(f"LLM 模式    : {settings.llm_mode}（live={settings.live_llm}）")
+    print(f"API Key     : {'已配置' if settings.api_key else '未配置'}")
+    print(f"PRD 目录    : {settings.prd_dir}（{len(list(settings.prd_dir.glob('*')))} 个文件）")
+    print(f"运行目录    : {settings.runs_dir}（{len(RunStore(settings).list_runs())} 次运行）")
+    if settings.llm_mode == "deepseek" and not settings.api_key:
+        print("  ! ATP_LLM_MODE=deepseek 但缺 LLM_API_KEY，会直接报错")
+    if settings.llm_mode == "mock":
+        print("  ! 当前为离线基线模式，评测数字不代表模型能力")
+    return 0
+
+
 def cmd_list(args) -> int:
     settings = _settings()
     orc = Orchestrator(settings, RunStore(settings))
@@ -168,6 +225,15 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("list", help="列出 PRD 与运行")
     p.set_defaults(func=cmd_list)
+
+    p = sub.add_parser("lint-golden", help="基准集质检（来源可定位/标题可判定/无重复）")
+    p.add_argument("--prd", required=True, help="prd_id 或文件路径")
+    p.add_argument("--golden", required=True)
+    p.add_argument("--sheet", default="", help="同时生成人工复核表单（Markdown 路径）")
+    p.set_defaults(func=cmd_lint)
+
+    p = sub.add_parser("doctor", help="环境自检")
+    p.set_defaults(func=cmd_doctor)
 
     p = sub.add_parser("export", help="导出 Excel")
     p.add_argument("--run", required=True)

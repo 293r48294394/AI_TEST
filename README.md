@@ -59,9 +59,17 @@ cp .env.example .env                   # 填入 LLM_API_KEY
 python run.py eval --prd coupon-center-prd --golden data/golden/coupon-golden.json --sweep --judge llm
 
 # 3. 测试与前端校验
-python -m pytest                       # 56 passed
+python -m pytest                       # 70 passed
 node scripts/check_web.js              # 模板编译校验（防白屏）
+python scripts/verify.py               # 一键验证：测试 + 前端 + 基准集 + 端到端 + 评测（约 9 秒）
+
+# 4. 基准集质检 + 生成人工复核表单
+python run.py lint-golden --prd coupon-center-prd --golden data/golden/coupon-golden.json --sheet reports/golden-review-sheet.md
+python run.py doctor                   # 换机器先跑这个
 ```
+
+CI 走同一套命令（`.github/workflows/ci.yml`）：pytest → 前端编译 → 基准集质检 → 端到端 → 评测，
+全部在 mock 模式下跑，不需要任何 API key。
 
 前端依赖（Vue 3 + Element Plus）已本地化到 `web/vendor/`，断网也能演示。
 `scripts/check_web.js` 用 Vue 编译器在 Node 里编译模板，把"页面白屏但 HTTP 200"这类问题变成一条可执行检查。
@@ -83,6 +91,28 @@ node scripts/check_web.js              # 模板编译校验（防白屏）
 这组数字本身就是一个结论：**规则基线产出的用例"看起来完整"（26 条、评审 81 分 pass），
 但对人工基准几乎零召回。** 评审分高 ≠ 有用——这正是为什么评测要独立于评审分做，
 也是这个项目最值得在面试里讲的一点。
+
+### 基准集质检（`python run.py lint-golden`）
+
+基准集如果没被机器检查过，"人工标注"就只是一句话。这里用确定性规则查四类脏数据：
+
+| 检查项 | 说明 |
+|---|---|
+| 来源可定位 | `source` 里的章节号 / 表号 / 脚注符号 / Q 编号必须能在 PRD 里真实找到 |
+| 标题可判定 | 必须有具体条件或预期，能测出 pass/fail（"优惠券功能正常"直接判 error） |
+| 期望可观测 | 必须含状态码/字段/提示/埋点/数值之一 |
+| 场景去重 | 标题相似度 ≥0.92 判重复（重复计入会虚高召回） |
+| 枚举与编号 | 六类分类、P0–P2、`G-001` 连续编号 |
+
+当前结果：**42 条，0 error / 0 warn**（12 正常 / 11 异常 / 11 边界 / 4 安全 / 2 兼容 / 2 性能，
+20 条隐性规则，覆盖 8 个功能）。质检器自身有 14 个测试，用脏数据逐条验证规则真的会触发——
+不然它只是装饰。
+
+人工复核表单（把 PRD 原文摘录并排放在每条基准点旁，复核只需判断对/错）：
+
+```bash
+python run.py lint-golden --prd coupon-center-prd --golden data/golden/coupon-golden.json --sheet reports/golden-review-sheet.md
+```
 
 另一个细节值得注意：`bare`（无检索）生成了更多测试点（34 > 26），
 但因为没约束住"六类覆盖 / 功能零覆盖"，评审反而掉到 65 分、被闸门拦下。
@@ -146,13 +176,13 @@ atp/
   coverage/rules.py    确定性质量规则（覆盖/查重/可追溯/空话）
   pipeline/orchestrator.py 状态机 + HITL 闸门 + 人工改动 diff
   export/xlsx.py       Excel 导出（含闸门拦截）
-  eval/                指标（含阈值敏感性）、LLM judge、三模式执行器、报告渲染
+  eval/                指标（含阈值敏感性）、LLM judge、基准集质检、三模式执行器、报告渲染
 app/api.py             FastAPI（提测/运行/确认/裁决/导出）
 web/index.html         单文件 Vue3 控制台（依赖本地化）
 scripts/check_web.js   前端模板编译校验（Node + Vue compiler）
 data/prd/              PRD（优惠券中心 v1.4，2478 字，10 处隐性规则）
 data/golden/           基准集（42 条，20 条隐性；AI 起草，待人工复核）
-tests/                 56 个测试
+tests/                 70 个测试
 reports/               评测报告
 docs/                  架构 / 实验计划 / 面试问答 / 简历叙事
 ```
