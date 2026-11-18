@@ -6,6 +6,9 @@ reports/*.json
 tests/_work/
 .pytest_tmp/
 .pytest_cache/
+# 受限环境下 mkdtemp 生成的 0o700 目录，权限受限删不掉，直接忽略
+pytest-cache-files-*/
+tmp*/
 
 # 环境与密钥
 .env
