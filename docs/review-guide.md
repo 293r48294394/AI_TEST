@@ -82,32 +82,41 @@ G-0XX 改 标题=满100减20券在订单金额100.00元时抵扣20.00元; 期望
 
 ---
 
-## 五、操作步骤（4 步，约 20–30 分钟）
+## 五、操作步骤（Excel 版，约 20–30 分钟）
 
 ```bash
 cd ai-testcase-platform
 
-# 1) 生成录入表（已生成过可跳过）
-python run.py review-apply --golden data/golden/coupon-golden.json --verdicts reports/golden-review.txt --template
+# 1) 生成 Excel 复核表（PRD 原文逐行展开、保留换行、结论列带下拉）
+python run.py review-export --golden data/golden/coupon-golden.json --out reports/golden-review.xlsx
 
-# 2) 用编辑器打开 reports/golden-review.txt，每行补上判定：
-#    G-001 通过
-#    G-003 改 期望=...; 分类=boundary
-#    G-013 删 与 G-041 场景重复
-#    （一条一行；# 开头是注释；文件带 BOM 也没关系）
+# 2) 用 Excel 打开 reports/golden-review.xlsx
+#    - G 列「结论」下拉选 通过 / 改 / 删（留空 = 未判定，导入会报错）
+#    - 结论=改 时在 H 列写：标题=xxx; 期望=xxx; 分类=boundary（只写要改的字段）
+#    - 结论=删 时在 H 列写一句理由
+#    - 「说明」页 B1 填你的名字
+#    - I 列是可以直接读的 PRD 原文（4.1 的表格已逐行展开成「字段 ｜ 类型 ｜ 必填 ｜ 约束」）
 
 # 3) 先试跑：只校验不写盘
-python run.py review-apply --golden data/golden/coupon-golden.json --verdicts reports/golden-review.txt --annotator "你的名字" --dry-run
+python run.py review-import --golden data/golden/coupon-golden.json --xlsx reports/golden-review.xlsx --dry-run
 
-# 4) 42 条都判完、质检 0 error 后正式写入
-python run.py review-apply --golden data/golden/coupon-golden.json --verdicts reports/golden-review.txt --annotator "你的名字"
+# 4) 42 条判完、质检 0 error 后写入
+python run.py review-import --golden data/golden/coupon-golden.json --xlsx reports/golden-review.xlsx
 ```
+
+> 也可以用纯文本版（`review-apply`）：`reports/golden-review.txt` 每行写判定。
+> 两种入口走同一个质检闸门（`apply_with_gate`），行为一致。
 
 第 4 步会做三件事，任何一件不满足都**拒绝写盘**：
 
 1. 42 条必须全部有判定（想先做一半就加 `--partial`）；
 2. 应用后自动跑基准集质检，**0 error 才写**（改了出处但章节不存在、分类写错，都会被拦）；
 3. 写入时把 `annotator` 改成你的名字、`version` 改成 `v1.0`、加 `review_status: human-reviewed`。
+
+### 为什么不用手改 markdown 表
+
+`reports/golden-review-sheet.md` 是纯文本备份，里面的表格会被压成一行（`字段 ｜ 类型` 之间没有换行），
+复制到 Excel 后很难读。**Excel 版才是为人工复核设计的**：单元格保留换行、表格逐行、结论可下拉、填完能导回。
 
 ## 六、怎么证明这是"人工"标注的
 

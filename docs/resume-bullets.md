@@ -34,7 +34,7 @@
    （引用 id 必须来自本次检索结果），格式一次通过率 `{{p}}%`，重试 `{{r}}` 次后收敛；
    评审闸门为 `revise` 时导出接口直接拒绝，避免低质量用例进入用例库。
 
-4. 为平台自身编写 **92 个 pytest**（解析/检索/契约修复/覆盖规则/闸门/导出/指标，全离线可跑），
+4. 为平台自身编写 **102 个 pytest**（解析/检索/契约修复/覆盖规则/闸门/导出/指标，全离线可跑），
    并将 AI 质量指标纳入评测报告（Match Rate / Fidelity / 格式合规率 / 采纳率 `{{q}}%`）。
 
 **关键词行**：FastAPI、pydantic、BM25 检索、human-in-the-loop、JSON Schema 约束生成、
@@ -59,7 +59,7 @@ pytest、评测基准集设计
    checks against retrieved chunks); first-pass format compliance `{{p}}%`, converging in `{{r}}`
    repair rounds; export is blocked when the review gate returns `revise`.
 
-4. Wrote 92 offline pytest cases covering parsing, retrieval, contract repair, coverage rules,
+4. Wrote 102 offline pytest cases covering parsing, retrieval, contract repair, coverage rules,
    gating and metrics; tracked Match Rate / Fidelity / format compliance / adoption (`{{q}}%`).
 
 ---
@@ -71,7 +71,7 @@ pytest、评测基准集设计
 | 基于 LangChain 和 DeepSeek 实现了 PRD 到测试用例的自动生成 | 把生成拆成四个可独立验证的阶段，并量化每阶段的失败模式 | 前者谁都能写，后者证明你会验证 |
 | 使用 AI 提升测试效率 70% | 采纳率 {{q}}%（{{u}}/{{n}} 条可用），其余需人工改写 | 前者无出处，后者有分母 |
 | 熟悉 Prompt Engineering | 用 JSON Schema 约束输出并设计 2 轮错误回喂，一次通过率 {{p}}% | 前者是形容词，后者是事实 |
-| 完成了一个测试平台 | 92 个测试覆盖四阶段与闸门，导出在评审不通过时拒绝 | 可验证的工程量 |
+| 完成了一个测试平台 | 102 个测试覆盖四阶段与闸门，导出在评审不通过时拒绝 | 可验证的工程量 |
 
 ---
 

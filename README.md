@@ -59,13 +59,14 @@ cp .env.example .env                   # 填入 LLM_API_KEY
 python run.py eval --prd coupon-center-prd --golden data/golden/coupon-golden.json --sweep --judge llm
 
 # 3. 测试与前端校验
-python -m pytest                       # 92 passed
+python -m pytest                       # 102 passed
 node scripts/check_web.js              # 模板编译校验（防白屏）
 python scripts/verify.py               # 一键验证：测试 + 前端 + 基准集 + 端到端 + 评测（约 9 秒）
 
-# 4. 基准集质检 + 人工复核
-python run.py lint-golden --prd coupon-center-prd --golden data/golden/coupon-golden.json --sheet reports/golden-review-sheet.md
-python run.py review-apply --golden data/golden/coupon-golden.json --verdicts reports/golden-review.txt --template
+# 4. 基准集质检 + 人工复核（Excel 版，表格逐行展开、结论下拉、可导回）
+python run.py lint-golden --prd coupon-center-prd --golden data/golden/coupon-golden.json
+python run.py review-export --golden data/golden/coupon-golden.json --out reports/golden-review.xlsx
+python run.py review-import --golden data/golden/coupon-golden.json --xlsx reports/golden-review.xlsx --dry-run
 python run.py doctor                   # 换机器先跑这个
 ```
 
@@ -228,7 +229,7 @@ data/prd/              coupon-center-prd.md（营销，2478 字，10 处隐性�
                        account-login-prd.md（账号安全，用于跨文档泛化验证）
 data/golden/           coupon-golden.json（42 条主基准，20 条隐性）
                        account-login-golden.json（20 条泛化探针，不当模型能力用）
-tests/                 92 个测试
+tests/                 102 个测试
 reports/               评测报告 + 基准集复核表单
 docs/                  架构 / 实验计划 / 面试问答 / 简历叙事 / 复核指南 / **声称-证据对照表** / 交接说明
 docs/examples/         真实运行的产物示例（人工改动 diff、评审报告）

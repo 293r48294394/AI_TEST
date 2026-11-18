@@ -311,6 +311,97 @@ def cmd_review_apply(args) -> int:
     return 0
 
 
+def cmd_review_export(args) -> int:
+    from atp.eval.review import load_doc
+    from atp.eval.review_xlsx import export_review_xlsx
+    from atp.parsers.prd import parse_file
+
+    settings = _settings()
+    golden = Path(args.golden)
+    if not golden.is_absolute() and not golden.exists():
+        golden = settings.golden_dir / golden.name
+    prd_path = _resolve_prd_path(settings, args.prd)
+    if not golden.exists() or prd_path is None:
+        print(f"[error] 找不到文件：golden={golden} prd={args.prd}", file=sys.stderr)
+        return 2
+    prd = parse_file(prd_path, prd_id=prd_path.stem)
+    out = Path(args.out)
+    export_review_xlsx(prd, load_doc(golden), out, annotator=args.annotator)
+    print(f"[export] Excel 复核表已生成：{out}")
+    print("  填 G 列「结论」（下拉：通过/改/删），结论=改 时在 H 列写 标题=...; 期望=...")
+    print(f"  填完执行：python run.py review-import --golden {golden} --xlsx {out} --annotator \"你的名字\"")
+    return 0
+
+
+def _resolve_prd_path(settings, ref: str) -> Path | None:
+    path = Path(ref)
+    if path.exists():
+        return path
+    for suffix in (".md", ".docx", ".txt"):
+        cand = settings.prd_dir / f"{ref}{suffix}"
+        if cand.exists():
+            return cand
+    return None
+
+
+def cmd_review_import(args) -> int:
+    from atp.eval.review import apply_with_gate, load_doc, save_doc
+    from atp.eval.review_xlsx import read_verdicts_xlsx
+    from atp.parsers.prd import parse_file
+
+    settings = _settings()
+    golden = Path(args.golden)
+    if not golden.is_absolute() and not golden.exists():
+        golden = settings.golden_dir / golden.name
+    xlsx = Path(args.xlsx)
+    prd_path = _resolve_prd_path(settings, args.prd)
+    if not golden.exists() or not xlsx.exists() or prd_path is None:
+        print(f"[error] 文件缺失：golden={golden} xlsx={xlsx} prd={args.prd}", file=sys.stderr)
+        return 2
+
+    verdicts, sheet_annotator, errors = read_verdicts_xlsx(xlsx)
+    if errors:
+        print("[error] Excel 读取有问题：", file=sys.stderr)
+        for e in errors[:10]:
+            print("  x " + e, file=sys.stderr)
+        return 2
+    annotator = (args.annotator or sheet_annotator or "").strip()
+    if not annotator:
+        print("[error] 缺少复核人：在 Excel『说明』页 B1 填，或用 --annotator", file=sys.stderr)
+        return 2
+
+    prd = parse_file(prd_path, prd_id=prd_path.stem)
+    doc = load_doc(golden)
+    rows, report, lint_report = apply_with_gate(
+        prd=prd,
+        doc=doc,
+        verdicts=verdicts,
+        annotator=annotator,
+        version=args.version,
+        allow_partial=args.partial,
+    )
+    print(f"[review] {report.summary()}")
+    if not report.ok:
+        print("[error] 应用失败（未写入）：", file=sys.stderr)
+        for e in report.errors[:10]:
+            print("  x " + e, file=sys.stderr)
+        return 1
+    print(f"[lint] {len(rows)} 条 → error {len(lint_report.errors)} / warn {len(lint_report.warns)}")
+    if report.deleted and any(w.code == "schema.id_sequence" for w in lint_report.warns):
+        print("  注意：有删除，编号不连续属正常（warn 不阻断评测）。")
+    for issue in lint_report.errors[:10]:
+        print(f"  x [{issue.code}] {issue.gid}: {issue.message}")
+    if not lint_report.ok:
+        print("[error] 质检未通过，拒绝写入。", file=sys.stderr)
+        return 1
+    if args.dry_run:
+        print("[dry-run] 校验通过，未写入")
+        return 0
+    save_doc(golden, doc, rows, annotator=annotator, version=args.version)
+    print(f"[done] 已写入 {golden}（annotator={annotator}）")
+    return 0
+
+
 def cmd_list(args) -> int:
     settings = _settings()
     orc = Orchestrator(settings, RunStore(settings))
@@ -401,6 +492,23 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--partial", action="store_true", help="允许只复核一部分")
     p.add_argument("--dry-run", action="store_true", help="只校验不写入")
     p.set_defaults(func=cmd_review_apply)
+
+    p = sub.add_parser("review-export", help="导出 Excel 复核表（PRD 原文可读、结论列下拉）")
+    p.add_argument("--golden", required=True)
+    p.add_argument("--prd", default="coupon-center-prd")
+    p.add_argument("--out", default="reports/golden-review.xlsx")
+    p.add_argument("--annotator", default="")
+    p.set_defaults(func=cmd_review_export)
+
+    p = sub.add_parser("review-import", help="读回 Excel 复核表并应用（质检通过才落盘）")
+    p.add_argument("--golden", required=True)
+    p.add_argument("--xlsx", default="reports/golden-review.xlsx")
+    p.add_argument("--prd", default="coupon-center-prd")
+    p.add_argument("--annotator", default="")
+    p.add_argument("--version", default="v1.0")
+    p.add_argument("--partial", action="store_true")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(func=cmd_review_import)
 
     p = sub.add_parser("export", help="导出 Excel")
     p.add_argument("--run", required=True)

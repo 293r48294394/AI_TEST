@@ -211,3 +211,27 @@ def render_template(doc: dict) -> str:
     for row in doc["test_points"]:
         lines.append(f"{row['id']}   # [{row.get('category')}] {row.get('title')}")
     return "\n".join(lines) + "\n"
+
+
+def apply_with_gate(
+    *,
+    prd,
+    doc: dict,
+    verdicts: dict[str, Verdict],
+    annotator: str,
+    version: str = "v1.0",
+    allow_partial: bool = False,
+):
+    """应用判定 + 质检闸门。返回 (rows, report, lint_report)。
+
+    质检不通过时 lint_report.ok 为 False，调用方必须拒绝落盘——
+    这条规则只有一处实现，txt 与 xlsx 两条入口共用，避免行为漂移。
+    """
+    from .golden_lint import lint
+
+    rows, report = apply_verdicts(
+        doc["test_points"], verdicts, annotator=annotator, version=version, allow_partial=allow_partial
+    )
+    if not report.ok:
+        return rows, report, None
+    return rows, report, lint(prd, rows)

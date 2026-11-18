@@ -9,7 +9,7 @@
 - [x] 四 Skill + 状态机 + HITL 闸门 + JSON 契约校验
 - [x] 离线启发式基线（无 key 也能跑通全链路，进 CI）
 - [x] 42 条人工标注基准集（20 条隐性规则）— **待你逐条复核后才算"人工标注"**
-- [x] 三模式评测器 + Markdown 报告 + 92 个测试
+- [x] 三模式评测器 + Markdown 报告 + 102 个测试
 - [x] Fidelity 双路径（启发式代理 / `--judge llm` 的 1–5 分评判）
 - [x] 阈值敏感性分析（`--sweep`）
 - [x] 前端模板编译校验（`node scripts/check_web.js`）

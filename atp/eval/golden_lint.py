@@ -288,20 +288,24 @@ def lint_files(prd_path: Path, golden_path: Path) -> LintReport:
 
 
 def render_review_sheet(prd: ParsedPRD, rows: list[dict], *, max_quote: int = 180) -> str:
-    """生成逐条复核表单：每条基准点旁边放上 PRD 原文，人只需要判断"这条对不对"。
+    """生成逐条复核表单（Markdown 备份版）。
 
-    这不是给机器看的，是给人的工作台：没有原文对照，"复核"就会变成"扫一眼标题就点通过"。
+    主推 Excel 版：`python run.py review-export` —— 表格逐行展开、保留换行、结论列下拉。
+    这里的 markdown 版只作备份/快速浏览，PRD 原文用 <br> 保留换行，避免挤成一行。
     """
-    from ..retrieval.bm25 import HybridRetriever
+    from .excerpt import excerpt_for, question_of
 
-    retriever = HybridRetriever(prd.chunks, top_k=2)
     lines = [
-        "# 基准集人工复核表单",
+        "# 基准集人工复核表单（Markdown 备份版）",
+        "",
+        "> **建议用 Excel 版复核**：`python run.py review-export --golden data/golden/coupon-golden.json`",
+        "> 它会生成 `reports/golden-review.xlsx`，表格逐行展开、保留换行、结论列带下拉，填完可 `review-import` 导回。",
+        "> 本文件的 PRD 原文列把表格压成了文本，只适合快速浏览。",
         "",
         "复核方式：逐行读「PRD 原文」→ 判断「标题/期望」是否忠实于需求 → 在结论列写 `通过` / `改` / `删`。",
         "",
         "复核完成后必须做三件事，否则这份基准集仍不能称为「人工标注」：",
-        "1. 把 `data/golden/coupon-golden.json` 里的 `annotator` 改成你的名字、`version` 改成 `v1.0`；",
+        "1. 用 `review-apply` 或 `review-import` 写入（会自动改 `annotator`/`version` 并跑质检）；",
         "2. `python run.py lint-golden --prd coupon-center-prd --golden data/golden/coupon-golden.json` 必须 0 error；",
         "3. 再跑评测，README 里的数字才作数。",
         "",
@@ -313,12 +317,10 @@ def render_review_sheet(prd: ParsedPRD, rows: list[dict], *, max_quote: int = 18
     for row in rows:
         gid = str(row.get("id", ""))
         source = str(row.get("source", ""))
-        query = f"{source} {row.get('title', '')}"
-        hits = retriever.retrieve(query, top_k=1)
-        quote = ""
-        if hits:
-            text = hits[0].chunk.text.replace("\n", " ").replace("|", "／")
-            quote = text[:max_quote] + ("…" if len(text) > max_quote else "")
+        e = excerpt_for(prd, source, question=question_of(source), max_lines=12)
+        quote = "<br>".join(_md(line) for line in e.lines)
+        if len(quote) > max_quote * 4:
+            quote = quote[: max_quote * 4] + "…"
         lines.append(
             f"| {gid} | {row.get('category', '')} | {_md(row.get('title', ''))} | {_md(row.get('expectation', ''))} | "
             f"{_md(source)} | {quote} |  |"
