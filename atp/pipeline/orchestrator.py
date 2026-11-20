@@ -199,7 +199,7 @@ class Orchestrator:
         try:
             self._stage_s2(state, client, prd, cfg)
             self._stage_s3(state, client, prd, cfg)
-            self._stage_s4(state, client)
+            self._stage_s4(state, client, prd)
         except Exception as exc:
             self._fail(state, state.stage, exc)
             return  # 失败也返回，不抛：状态里已记录原因与已产生的产物
@@ -258,12 +258,17 @@ class Orchestrator:
         state.stages.append(rec)
         self.store.log_event(state.run_id, {"event": "stage_done", **rec.model_dump(mode="json")})
 
-    def _stage_s4(self, state: RunState, client: LLMClient) -> None:
+    def _stage_s4(self, state: RunState, client: LLMClient, prd: ParsedPRD) -> None:
         rec = StageRecord(stage="s4_review")
         started = time.perf_counter()
         assert state.testmap_final is not None and state.testpoints is not None and state.cases is not None
         report: ReviewReport = s4_review.run(
-            client, self.settings, state.testmap_final, state.testpoints.test_points, state.cases.cases
+            client,
+            self.settings,
+            state.testmap_final,
+            state.testpoints.test_points,
+            state.cases.cases,
+            chunks=prd.chunks,
         )
         state.review = report
         self.store.save_artifact(state.run_id, "05_review.json", report)

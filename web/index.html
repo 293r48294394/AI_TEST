@@ -191,6 +191,8 @@
               <div class="kv">评审<b>{{ run.review ? run.review.score : '-' }}</b></div>
               <div style="flex:1"></div>
               <el-button size="small" @click="exportXlsx" :disabled="!run.cases">导出 Excel</el-button>
+              <el-button size="small" @click="exportDraft" :disabled="!run.cases"
+                         :type="run.review && run.review.gate === 'revise' ? 'warning' : 'default'">导出草稿</el-button>
             </div>
 
             <el-alert v-if="run.status === 'awaiting_human'" type="warning" :closable="false" show-icon
@@ -236,9 +238,18 @@
                                 class="mt8" @keyup.enter="addRule(row)"></el-input>
                     </template>
                   </el-table-column>
-                  <el-table-column label="证据" width="150">
+                  <el-table-column label="证据引用" width="260">
                     <template #default="{ row }">
-                      <el-tag v-for="s in row.sources" :key="s.chunk_id" size="small" effect="plain">{{ s.chunk_id }}</el-tag>
+                      <el-tag v-for="(s, i) in row.sources" :key="s.chunk_id" size="small" effect="plain"
+                              class="rule-tag" :closable="editableMap" @close="row.sources.splice(i, 1)">{{ s.chunk_id }}</el-tag>
+                      <template v-if="editableMap">
+                        <el-select v-model="row._newSource" size="small" filterable placeholder="选块号补引用" class="mt8">
+                          <el-option v-for="c in chunkOptions" :key="c.chunk_id"
+                                     :label="c.chunk_id + ' ' + c.heading" :value="c.chunk_id"></el-option>
+                        </el-select>
+                        <el-input v-model="row._newQuote" size="small" placeholder="原文片段（可选）" class="mt8"></el-input>
+                        <el-button size="small" class="mt8" @click="addSource(row)">加引用</el-button>
+                      </template>
                     </template>
                   </el-table-column>
                 </el-table>
@@ -434,6 +445,7 @@ var app = createApp({
     const pasteId = ref('coupon-center-v1.4');
     const pasteText = ref('');
     const editableDraft = ref(null); // 本地编辑中的测试地图
+    const chunkOptions = ref([]);    // 当前 PRD 的可选引用块（chunk_id + 标题）
 
     async function api(path, opts = {}) {
       const res = await fetch(path, opts);
@@ -462,8 +474,9 @@ var app = createApp({
         // 处于闸门时，把 AI 草稿深拷贝进可编辑草稿，避免直接改动服务端状态
         const src = run.value.testmap_ai || run.value.testmap_final;
         editableDraft.value = run.value.status === 'awaiting_human' && src
-          ? src.features.map(f => ({ ...JSON.parse(JSON.stringify(f)), _newRule: '' }))
+          ? src.features.map(f => ({ ...JSON.parse(JSON.stringify(f)), _newRule: '', _newSource: '', _newQuote: '' }))
           : null;
+        await loadChunks(id);
         const ev = await api(`/api/runs/${id}/events`);
         llmCalls.value = ev.llm_calls || [];
         tab.value = run.value.status === 'awaiting_human' ? 'map' : (run.value.review ? 'review' : 'points');
@@ -503,6 +516,24 @@ var app = createApp({
       row.rules = row.rules || [];
       row.rules.push(v);
       row._newRule = '';
+    };
+
+    // 给人一个"补引用"的入口：不加引用，下游评审看不到原文，就会把 PRD 里有的错误码判成幻觉
+    const loadChunks = async (id) => {
+      try {
+        const r = await api(`/api/runs/${id}/chunks`);
+        chunkOptions.value = r.items || [];
+      } catch (e) { chunkOptions.value = []; }
+    };
+
+    const addSource = (row) => {
+      const cid = (row._newSource || '').trim();
+      if (!cid) return;
+      row.sources = row.sources || [];
+      if (row.sources.some(s => s.chunk_id === cid)) { ElMessage.warning('这个块已经引用了'); return; }
+      row.sources.push({ chunk_id: cid, quote: (row._newQuote || '').trim() });
+      row._newSource = '';
+      row._newQuote = '';
     };
 
     const submitTestmap = async () => {
@@ -560,6 +591,12 @@ var app = createApp({
       window.open(`/api/runs/${run.value.run_id}/export.xlsx`, '_blank');
     };
 
+    // 评审未通过时的应急出口：文件名带 _draft，表内「导出类型」标注草稿，不冒充正式交付
+    const exportDraft = () => {
+      if (!run.value) return;
+      window.open(`/api/runs/${run.value.run_id}/export.xlsx?draft=1`, '_blank');
+    };
+
     const doUpload = async (opt) => {
       busy.value = true;
       try {
@@ -599,9 +636,9 @@ var app = createApp({
 
     return {
       health, prds, runs, run, llmCalls, currentPrd, mode, busy, tab,
-      pasteVisible, pasteId, pasteText,
+      pasteVisible, pasteId, pasteText, chunkOptions,
       refreshAll, loadRun, startRun, mapRows, editableMap, pointRows, caseRows,
-      addRule, submitTestmap, acceptDraft, adopt, verdictOf, exportXlsx, doUpload, submitPaste,
+      addRule, addSource, submitTestmap, acceptDraft, adopt, verdictOf, exportXlsx, exportDraft, doUpload, submitPaste,
       catText, catType, statusText, stageText,
     };
   },

@@ -26,6 +26,11 @@ SYSTEM = """你是一名测试经理，负责对 AI 生成的测试用例做语�
 2. 找"看起来对但跑不通"的步骤：缺少前置数据、依赖未定义的接口、预期无法观测；
 3. 找幻觉：用例里出现了 PRD 中不存在的字段、错误码、状态机。
 
+判幻觉的硬性要求：**先到下面给出的原文里核对**。
+原文里出现过的错误码、字段、状态、数字，一律不算幻觉；
+没有给出原文（或原文里查不到依据）时，不得判幻觉，最多判 risk 或 vague，
+message 里要写清楚"原文未覆盖到该处"。
+
 输出严格 JSON：
 {"semantic_issues": [{"type": "risk|hallucination|vague|coverage", "severity": "blocker|major|minor", "message": "...", "ref": "TC-003"}],
  "suggestions": ["可执行的改进建议，每条不超过 40 字"]}
@@ -59,14 +64,20 @@ def run(
 
     suggestions: list[str] = []
     if use_semantic and cases:
-        features_block = "\n".join(f"- {f.id} {f.name}｜规则：{'；'.join(f.rules) or '无'}" for f in tm.features)
+        features_block = "\n".join(
+            f"- {f.id} {f.name}｜规则：{'；'.join(f.rules) or '无'}｜证据：{_srcs(f)}" for f in tm.features
+        )
         points_block = "\n".join(f"- {p.id} {p.category} {p.title}" for p in points[:40])
         cases_block = "\n".join(
             f"- {c.id} <- {c.test_point_id}｜{c.title}｜步骤："
             + " / ".join(f"{s.action}→{s.expected}" for s in c.steps[:4])
             for c in cases[:40]
         )
-        user = f"""需求拆解：
+        evidence_block = _evidence(tm, chunks)
+        user = f"""PRD 原文（按被引用的块摘录；判"PRD 里有没有"只能依据这里）：
+{evidence_block}
+
+需求拆解：
 {features_block}
 
 已生成的测试点：
@@ -109,3 +120,40 @@ def run(
 
 def _map_type(t: str) -> str:
     return {"risk": "risk", "hallucination": "hallucination", "vague": "vague", "coverage": "coverage"}.get(t, "risk")
+
+
+def _srcs(f) -> str:
+    """把某个功能引用的原文片段压成一行，供评审核对。"""
+    parts = [f"{s.chunk_id}「{s.quote[:60]}」" for s in getattr(f, "sources", [])[:3]]
+    return "；".join(parts) if parts else "无引用（该功能无法溯源，优先按 risk 提）"
+
+
+def _evidence(tm: TestMap, chunks: list | None) -> str:
+    """把功能引用到的 PRD 块原文摘出来喂给评审。
+
+    没有这一步，评审只能凭模型自身记忆判"错误码是否存在"，
+    于是把 PRD 里明明写了的错误码判成幻觉（实测 6 条问题里 2 条属此类）。
+    """
+    if not chunks:
+        return "（本次未提供原文；据此不得判幻觉，只能判 risk/vague）"
+    by_id: dict[str, object] = {}
+    for c in chunks:
+        cid = getattr(c, "chunk_id", None) or (c.get("chunk_id") if isinstance(c, dict) else None)
+        if cid:
+            by_id[str(cid)] = c
+    wanted: list[str] = []
+    for f in tm.features:
+        for s in getattr(f, "sources", []):
+            if s.chunk_id in by_id and s.chunk_id not in wanted:
+                wanted.append(s.chunk_id)
+    if not wanted:
+        return "（功能均未引用任何块；据此不得判幻觉，只能判 risk/vague）"
+    lines = []
+    for cid in wanted[:12]:
+        c = by_id[cid]
+        heading = getattr(c, "heading", "") or (c.get("heading", "") if isinstance(c, dict) else "")
+        text = getattr(c, "text", "") or (c.get("text", "") if isinstance(c, dict) else "")
+        lines.append(f"[{cid}] {heading}\n{str(text)[:900]}")
+    omitted = len(wanted) - len(lines)
+    tail = f"\n（另有 {omitted} 个被引用块未展开）" if omitted > 0 else ""
+    return "\n\n".join(lines) + tail

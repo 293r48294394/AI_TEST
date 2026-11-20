@@ -50,3 +50,55 @@ def test_adoption_rate_math():
     ]
     rate = api._adoption_rate(state)
     assert rate["total"] == 2 and rate["usable"] == 1 and rate["rate"] == 0.5
+
+
+def test_chunks_endpoint_lists_prd_blocks(monkeypatch):
+    monkeypatch.setattr(api, "_load", lambda rid: _state())
+    monkeypatch.setattr(
+        api.store,
+        "load_artifact",
+        lambda rid, name: [{"chunk_id": "P-0004", "heading": "4.1 优惠券创建", "text": "…"}],
+    )
+    items = api.get_chunks("r-test")["items"]
+    assert items == [{"chunk_id": "P-0004", "heading": "4.1 优惠券创建"}]
+
+
+def test_resume_rejects_unknown_chunk_id(monkeypatch):
+    """人可以补引用，但不能凭空造块号——否则下游评审会被指向不存在的原文。"""
+    import pytest
+
+    monkeypatch.setattr(api, "_load", lambda rid: _state())
+    monkeypatch.setattr(api.store, "load_artifact", lambda rid, name: [{"chunk_id": "P-0004", "heading": "4.1"}])
+    monkeypatch.setattr(api.orchestrator, "resume", lambda rid, override: _state())
+
+    payload = api.TestMapInput(
+        features=[
+            {"id": "F-01", "name": "券模板", "summary": "", "rules": ["r"], "sources": [{"chunk_id": "P-9999", "quote": ""}]}
+        ]
+    )
+    with pytest.raises(api.HTTPException) as exc:
+        api.resume_run("r-test", payload)
+    assert exc.value.status_code == 400
+    assert "P-9999" in exc.value.detail
+
+
+def test_resume_accepts_valid_chunk_id(monkeypatch):
+    seen = {}
+
+    def fake_resume(rid, override):
+        seen["override"] = override
+        return _state()
+
+    monkeypatch.setattr(api, "_load", lambda rid: _state())
+    monkeypatch.setattr(api.store, "load_artifact", lambda rid, name: [{"chunk_id": "P-0004", "heading": "4.1"}])
+    monkeypatch.setattr(api.orchestrator, "resume", fake_resume)
+
+    payload = api.TestMapInput(
+        features=[
+            {"id": "F-01", "name": "券模板", "summary": "", "rules": ["r"], "sources": [{"chunk_id": "P-0004", "quote": "原文"}]}
+        ]
+    )
+    api.resume_run("r-test", payload)
+    src = seen["override"].features[0].sources[0]
+    assert src.chunk_id == "P-0004"
+    assert src.quote == "原文"

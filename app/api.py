@@ -148,6 +148,14 @@ def get_run(run_id: str) -> dict:
     return _state_payload(_load(run_id))
 
 
+@app.get("/api/runs/{run_id}/chunks")
+def get_chunks(run_id: str) -> dict:
+    """PRD 切块清单：供人工确认时给规则挑引用（chunk_id + 标题）。"""
+    _load(run_id)
+    rows = store.load_artifact(run_id, "00_prd_chunks.json") or []
+    return {"items": [{"chunk_id": r["chunk_id"], "heading": r.get("heading", "")} for r in rows]}
+
+
 @app.post("/api/runs/{run_id}/resume")
 def resume_run(run_id: str, payload: TestMapInput | None = None) -> dict:
     state = _load(run_id)
@@ -157,6 +165,14 @@ def resume_run(run_id: str, payload: TestMapInput | None = None) -> dict:
             override = TestMap(prd_id=state.prd_id, features=[FeatureItem.model_validate(f) for f in payload.features])
         except Exception as exc:
             raise HTTPException(status_code=400, detail=f"测试地图格式错误：{exc}") from exc
+        # 引用完整性：人可以加引用，但不能凭空造块号（否则下游评审会被指向不存在的原文）
+        valid = {r["chunk_id"] for r in (store.load_artifact(run_id, "00_prd_chunks.json") or [])}
+        bad = sorted({s.chunk_id for f in override.features for s in f.sources} - valid)
+        if bad:
+            raise HTTPException(
+                status_code=400,
+                detail=f"引用块不存在：{bad}；可用块见 GET /api/runs/{run_id}/chunks",
+            )
     try:
         return _state_payload(orchestrator.resume(run_id, override))
     except ValueError as exc:
