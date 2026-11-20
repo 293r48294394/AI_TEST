@@ -68,7 +68,7 @@ cp .env.example .env                   # 填入 LLM_API_KEY
 python run.py eval --prd coupon-center-prd --golden data/golden/coupon-golden.json --sweep --judge llm
 
 # 3. 测试与前端校验
-python -m pytest                       # 102 passed
+python -m pytest                       # 117 passed
 node scripts/check_web.js              # 模板编译校验（防白屏）
 python scripts/verify.py               # 一键验证：测试 + 前端 + 基准集 + 端到端 + 评测（约 9 秒）
 
@@ -109,6 +109,24 @@ CI 走同一套命令（`.github/workflows/ci.yml`）：pytest → 前端编译 
 
 > 离线基线（mock）仍保留在 CI 里，用于验证管道：它召回 2.4%、评审却 89 分 pass，
 > 正好说明"评审分高 ≠ 有用"。
+
+### 同一份文档跑三次，排序并不稳定
+
+上表是 11-18 那一次。后来又在同一台机器、同一份 PRD、同一个模型上跑了三次（`reports/eval-*-20261120-*.md`）：
+
+| 跑次 | bare | rag | rag_hitl |
+|---|---|---|---|
+| 11-18 | 30.9% | 33.3% | **35.7%** |
+| 11-20 20:44 | 33.3% | **45.2%** | 30.9% |
+| 11-20 20:50 | 33.3% | **38.1%** | 35.7% |
+| 11-20 21:24 | 30.9% | 30.9% | **42.9%** |
+
+排序会变，`rag` 能在 30.9%–45.2% 之间跳。**42 条基准撑不起"哪个方案更好"的结论**，所以本仓库只报两件稳定的事：
+
+1. 四种组合**全部 ≤ 43%**——一半以上的基准场景被漏掉；
+2. **裸提示词最稳**（30.9–33.3%），加检索/人工都没有稳定突破这个量级。
+
+要拿"提升 X%"当结论，至少要做到：基准集扩到数百条、每种模式重复 3–5 次并给出区间。这是下一步该做的实验，不是现在能声称的结果。
 
 **三种模式共同漏掉的 24 条，能归成 5 类固定失效模式**（`reports/*.json` 的 `missed` 字段可复现）：
 
@@ -244,7 +262,7 @@ BM25 + 符号加权在这个场景召回不输小模型 embedding，而且**结�
 
 ## 六、环境约束与工程取舍（真实发生过的问题）
 
-本机沙箱里 `pip install` 在解包阶段被权限策略拦截（`WinError 5`），`tempfile.mkdtemp`
+开发环境的构建权限受限时，`pip install` 会在解包阶段被策略拦截（`WinError 5`），`tempfile.mkdtemp`
 建立的目录也无法写入。这些限制直接塑造了架构：
 
 1. **核心零第三方依赖**：LLM HTTP 用 `urllib`、docx 用 `zipfile + XML`、检索用 BM25、
@@ -282,9 +300,9 @@ data/prd/              coupon-center-prd.md（营销，2478 字，10 处隐性�
                        account-login-prd.md（账号安全，用于跨文档泛化验证）
 data/golden/           coupon-golden.json（42 条主基准，20 条隐性）
                        account-login-golden.json（20 条泛化探针，不当模型能力用）
-tests/                 102 个测试
+tests/                 117 个测试
 reports/               评测报告 + 基准集复核表单
-docs/                  架构 / 实验计划 / 面试问答 / 简历叙事 / 复核指南 / **声称-证据对照表** / 交接说明
+docs/                  架构 / 复核指南 / **声称-证据对照表**（每句结论对应哪条命令、哪个测试）
 docs/examples/         真实运行的产物示例（人工改动 diff、评审报告）
 ```
 
@@ -307,10 +325,6 @@ docs/examples/         真实运行的产物示例（人工改动 diff、评审�
 
 ---
 
-## 九、接下来三周（详见 `docs/experiment-plan.md`）
+## 九、目录之外的取舍
 
-| 周 | 目标 | 产出 |
-|---|---|---|
-| W1 | 接真实模型跑通，替换 README 数字 | 真实三模式报告 + 首次失败分析 |
-| W2 | 基准集人工复核 + LLM judge 致率抽检 + 逐条裁决 | 基准集可称"人工标注"、Fidelity 可信、采纳率有数 |
-| W3 | 包装：README 数字、3 分钟演示、简历 bullet、面试 FAQ | 投递材料 |
+> 这一份 README 只写**工程结论**。过程记录、待办、计划都放在仓库之外，不占访客的注意力。

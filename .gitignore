@@ -32,3 +32,8 @@ __pycache__/
 .dom.html
 .chrome-prof/
 .uitest/
+
+# 个人工作笔记（不进仓库，放在仓库外的本地副本）
+下一步*.md
+交接说明*.md
+.commit-msg.txt
