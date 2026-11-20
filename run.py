@@ -425,11 +425,13 @@ def cmd_export(args) -> int:
     store = RunStore(settings)
     state = store.load(args.run)
     try:
-        path = export_xlsx(state, store.dir(args.run) / "artifacts")
+        path = export_xlsx(state, store.dir(args.run) / "artifacts", force_draft=args.draft)
     except ExportBlocked as exc:
         print(f"[blocked] {exc}", file=sys.stderr)
         return 3
     print(f"[export] {path}")
+    if getattr(args, "draft", False):
+        print("  注意：这是草稿（评审未通过），不要当正式交付物。")
     return 0
 
 
@@ -516,6 +518,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("export", help="导出 Excel")
     p.add_argument("--run", required=True)
+    p.add_argument("--draft", action="store_true", help="评审未通过时导出草稿（文件名带 _draft，表内标注草稿）")
     p.set_defaults(func=cmd_export)
 
     args = parser.parse_args(argv)

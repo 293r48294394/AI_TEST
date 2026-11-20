@@ -33,10 +33,30 @@ def test_export_blocked_when_revise(orc, state, workdir):
     with pytest.raises(ExportBlocked) as exc:
         export_xlsx(done, workdir)
     assert "revise" in str(exc.value)
+    # 提示必须指向一个真实存在的入口，否则用户被指到死路
+    assert "--draft" in str(exc.value)
 
     # 草稿模式允许导出，文件名带 _draft
     path = export_xlsx(done, workdir, force_draft=True)
     assert "_draft" in path.name
+
+
+def test_human_edit_sources_are_validated():
+    """控制台提交的 sources 必须被正规化成 SourceRef；塞垃圾要报错。
+
+    背景：直接向 list[SourceRef] append 原始 dict 会绕过校验（pydantic 列表原地修改
+    不校验），所以人工编辑入口一定要走 model_validate。
+    """
+    from atp.models import FeatureItem, SourceRef
+
+    ok = FeatureItem.model_validate(
+        {"id": "F-01", "name": "券模板", "summary": "", "sources": [{"chunk_id": "P-0004", "quote": "2–20 字"}]}
+    )
+    assert isinstance(ok.sources[0], SourceRef)
+    assert ok.sources[0].chunk_id == "P-0004"
+
+    with pytest.raises(Exception):
+        FeatureItem.model_validate({"id": "F-01", "name": "券模板", "summary": "", "sources": [{"foo": 1}]})
 
 
 def test_export_includes_adoption_sheet_rows(orc, state, workdir):

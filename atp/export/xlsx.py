@@ -25,7 +25,8 @@ def build_workbook(state: RunState, *, force_draft: bool = False) -> tuple[objec
         raise ExportBlocked(
             f"评审未通过（gate=revise, score={review.score}），"
             f"存在 {sum(1 for i in review.issues if i.severity == 'blocker')} 个阻断问题，禁止导出正式用例。"
-            "请先修复，或以草稿模式导出。"
+            "请先修复；确需应急可导出草稿：命令行加 --draft，"
+            "控制台点「导出草稿」，或 GET /api/runs/<id>/export.xlsx?draft=1（文件名带 _draft，表内标注草稿）。"
         )
 
     wb = Workbook()
